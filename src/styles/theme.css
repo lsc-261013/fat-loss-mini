@@ -1,0 +1,23 @@
+page {
+  --brand: #28745b; --ink: #242a27; --muted: #69716c;
+  --surface: #fff; --canvas: #fff; --line: #e8ebe9; --wash: #f4f5f5;
+  background: var(--canvas); color: var(--ink); line-height: 1.55;
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: max(28rpx,14px); font-variant-numeric: tabular-nums;
+}
+view, button, input, scroll-view { box-sizing: border-box; }
+button { font-weight: 500; min-width:44px; min-height:44px; touch-action:manipulation; }
+page button::after { border: 0; }
+/* #ifdef H5 */
+/* Native-style feedback must sit above custom editing sheets. */
+uni-modal, uni-toast { z-index: 2000; }
+/* #endif */
+button[disabled] { opacity: .45; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.page-caption { display: block; font-size: max(26rpx,13px); color: var(--muted); margin-top: 12rpx; }
+.primary-action,.secondary-action { border-radius: 12rpx; font-size: max(28rpx,14px); margin-top: 20rpx; min-height: 44px; line-height: max(88rpx,44px); }
+.primary-action { background: var(--brand); color: white; }
+.secondary-action { background: var(--wash); color: var(--brand); }
+.field-error { display: block; color: #a34831; font-size: max(24rpx,12px); margin: 12rpx 0; }
+.local-note { display: block; color: var(--muted); font-size: max(24rpx,12px); line-height: 1.7; margin: 28rpx 0; }
+@media (prefers-reduced-motion: reduce) { view,button { transition: none !important; animation: none !important; } }

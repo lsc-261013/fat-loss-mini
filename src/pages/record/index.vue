@@ -1,356 +1,118 @@
 <template>
   <view class="record-page">
-    <!-- 拍照识别预留 -->
-    <view class="camera-bar" @click="onCamera">
-      <text class="camera-icon-text">[ + ]</text>
-      <text class="camera-label">拍照识别</text>
-      <text class="camera-badge">即将上线</text>
+    <view v-if="journal.error" class="error-banner"><text>数据未就绪：{{ journal.error }}。原数据保留，请勿清理缓存。</text><button @tap="journal.refresh()">重试读取</button></view>
+    <view class="date-bar"><button aria-label="前一天" @tap="changeDate(shiftDate(journal.selectedDate,-1))">‹</button><picker mode="date" :value="journal.selectedDate" :end="journal.today" start="1900-01-01" @change="onDatePick"><view class="date-value">{{ journal.selectedDate }} {{ isToday ? '· 今天' : '' }} ▾</view></picker><button aria-label="后一天" :disabled="isToday" @tap="changeDate(shiftDate(journal.selectedDate,1))">›</button></view>
+    <view class="date-tools"><picker v-if="savedDates.length" :range="savedDates" @change="onSavedPick"><view class="target-link">历史记录 ({{ savedDates.length }}) ▾</view></picker><button v-if="!isToday" class="text-button" @tap="changeDate(journal.today)">回到今天</button></view>
+    <view v-if="!isToday" class="history-banner">{{ journal.selectedDate }} 的记录，可在此补记{{ day.target ? '。目标沿用当天值。' : '。未保存当日目标。' }}</view>
+    <CalorieCard v-if="day.target" :target="day.target.targetCalories" :consumed="total.kcal" :macros="macroPayload" />
+    <view v-else class="simple-summary"><view><text class="summary-label">{{ isToday ? '今日' : '当日' }}已记录</text><text class="summary-value">{{ Math.round(total.kcal) }} <text class="summary-unit">千卡</text></text></view><text v-if="isToday" class="target-link" @tap="openProfile">设置参考目标 ›</text><text v-else class="target-link">无历史目标</text></view>
+    <view class="journal-toolbar">
+      <view class="journal-tabs"><button :class="{ active: activeList === 'record' }" @tap="switchList('record')">已吃 <text>{{ day.entries.length }}</text></button><button :class="{ active: activeList === 'plan' }" @tap="switchList('plan')">计划 <text>{{ planCount }}</text></button></view>
+      <button class="add-button" :disabled="!!journal.error" @tap="adding = !adding; addMode = activeList">{{ adding ? '取消添加' : '＋ 添加' }}</button>
     </view>
-
-    <!-- 热量总览 -->
-    <CalorieCard
-      v-if="userStore.nutritionTarget"
-      :target="userStore.nutritionTarget.targetCalories"
-      :consumed="recordsStore.todayTotal.kcal"
-      :macros="macroPayload"
-    />
-
-    <!-- 食材选择器 -->
-    <FoodPicker @add="onAddFood" />
-
-    <!-- 今日计划 -->
-    <view class="plan-section">
-      <view class="plan-header">
-        <text class="plan-title">今日计划</text>
-        <text class="plan-add-btn" @tap="showPlanPicker = true">+ 添加</text>
-      </view>
-      <view v-if="planStore.planItems.length > 0">
-        <template v-for="(group, gi) in groupedPlanItems" :key="gi">
-          <view v-if="group[0].groupName" class="plan-group-head">
-            <text class="plan-group-label">📋 {{ group[0].groupName }}</text>
-            <text class="plan-group-eat" @tap="eatRecipeGroup(group)">全吃</text>
-          </view>
-          <view v-for="item in group" :key="item.id" class="plan-item" :class="{ eaten: item.eaten }">
-            <text class="plan-emoji">{{ getPlanEmoji(item.foodId) }}</text>
-            <text class="plan-name">{{ item.foodName }}</text>
-            <text class="plan-grams">{{ item.grams }}g</text>
-            <text class="plan-kcal">≈{{ item.kcal }}千卡</text>
-            <text class="plan-eat-btn" :class="{ done: item.eaten }" @tap="eatItem(item)">{{ item.eaten ? '✓' : '吃了' }}</text>
-            <text class="plan-del" @tap="planStore.removeFromPlan(item.id)">×</text>
-          </view>
-        </template>
-      </view>
-      <view v-else class="plan-empty-hint">点击「+ 添加」规划饮食</view>
+    <view v-if="adding && !journal.error" class="add-panel">
+      <view class="add-heading"><text>{{ addMode === 'record' ? '记下吃过的食物' : '添加待吃食物' }}</text><text class="add-date">{{ journal.selectedDate }}</text></view>
+      <FoodPicker :key="journal.selectedDate + addMode" :action-label="addMode === 'record' ? '保存记录' : '加入计划'" @add="onAddFood" />
     </view>
-
-    <!-- 今日记录列表 -->
-    <view class="today-section">
-      <view class="section-header-row">
-        <text class="section-label">已吃记录</text>
-        <view style="display:flex;gap:12rpx;">
-          <text v-if="recordsStore.todayEntries.length > 0" class="entry-mgr-btn" @tap="entryManageMode = !entryManageMode">
-            {{ entryManageMode ? '完成' : '管理' }}
-          </text>
-          <text v-if="entryManageMode" class="entry-del-all" @tap="batchDeleteEntries">删除选中</text>
-        </view>
+    <view v-if="activeList === 'record'" class="section-card">
+      <view class="section-head"><view><text class="section-caption">{{ day.entries.length ? '合计 ' + Math.round(total.kcal) + ' 千卡' : '饮食明细' }}</text></view><button v-if="day.entries.length" class="text-button" @tap="manageMode = !manageMode; selectedIds = []">{{ manageMode ? '完成' : '管理' }}</button></view>
+      <view v-if="!day.entries.length" class="empty-state"><text class="empty-title">{{ isToday ? '今天还没有记录' : '这一天还没有记录' }}</text><text>点「＋ 添加」，选择食物和分量。</text></view>
+      <button v-if="manageMode" class="text-button" @tap="selectedIds = selectedIds.length === day.entries.length ? [] : day.entries.map(e => e.id)">{{ selectedIds.length === day.entries.length ? '取消全选' : '全选记录' }}</button>
+      <view v-for="entry in day.entries" :key="entry.id" class="entry-row" @tap="manageMode && toggleSelect(entry.id)">
+        <view v-if="manageMode" class="check" :class="{ checked: selectedIds.includes(entry.id) }">{{ selectedIds.includes(entry.id) ? '✓' : '' }}</view>
+        <view class="entry-info"><text class="entry-name">{{ entry.food.name }}</text><text v-if="incompleteNutrition(entry.food)" class="entry-meta">营养数据未完善 · 热量已计入</text><text class="entry-meta">{{ entry.grams }} g<text v-if="entry.planItemId" class="source-label">来自计划</text></text></view>
+        <view class="entry-actions"><text class="entry-kcal">{{ Math.round(entry.subtotalKcal) }} <text>千卡</text></text><button v-if="!manageMode" class="text-button" @tap.stop="editing = { entry, date: journal.selectedDate }">修改</button></view>
       </view>
-
-      <view v-if="recordsStore.todayEntries.length === 0" class="empty-list">
-        <text class="empty-text">还没有记录，从上方选择食材添加</text>
-      </view>
-
-      <view v-for="entry in recordsStore.todayEntries" :key="entry.id" class="entry-item"
-        :class="{ 'entry-mg': entryManageMode }" @tap="entryManageMode ? toggleEntrySelect(entry.id) : null">
-        <view v-if="entryManageMode" class="entry-check" :class="{ checked: selectedEntryIds.includes(entry.id) }">
-          <text v-if="selectedEntryIds.includes(entry.id)">✓</text>
-        </view>
-        <text class="entry-emoji">{{ foodEmoji(entry.food.id) }}</text>
-        <view class="entry-info">
-          <text class="entry-name">{{ entry.food.name }}</text>
-          <text class="entry-grams">{{ entry.grams }}g</text>
-        </view>
-        <text class="entry-kcal">{{ Math.round(entry.subtotalKcal) }} 千卡</text>
-        <text v-if="!entryManageMode" class="entry-delete" @click="onDeleteEntry(entry.id, entry.food.id)">×</text>
-      </view>
+      <button v-if="manageMode" class="delete-button" :disabled="!selectedIds.length" @tap="deleteSelected">删除选中 ({{ selectedIds.length }})</button>
     </view>
-
-    <!-- 底部汇总 -->
-    <view v-if="recordsStore.todayEntries.length > 0 && userStore.nutritionTarget" class="bottom-bar">
-      <text class="bottom-total" :class="{ over: recordsStore.todayTotal.kcal > userStore.nutritionTarget.targetCalories }">
-        {{ Math.round(recordsStore.todayTotal.kcal) }} / {{ userStore.nutritionTarget.targetCalories }} 千卡
-      </text>
-    </view>
-
-    <!-- 添加计划弹窗 -->
-    <view v-if="showPlanPicker" class="plan-overlay" @tap="showPlanPicker = false">
-      <view class="plan-panel" @tap.stop>
-        <scroll-view scroll-y class="plan-food-list">
-          <text class="plan-panel-title">添加到计划</text>
-          <view v-for="cat in planCategories" :key="cat.key">
-            <text class="plan-cat-label">{{ cat.label }}</text>
-            <view class="plan-food-grid">
-              <view v-for="f in getFoodsByCat(cat.key)" :key="f.id" class="plan-food-chip"
-                :class="{ selected: planFoodId === f.id }"
-                @tap="planFoodId = f.id; planGrams = planStore.getRememberedGrams(f.id) || 100; planRecipeId = ''"
-              >{{ foodEmoji(f.id) }} {{ f.name }}</view>
-            </view>
-          </view>
-          <text class="plan-cat-label">📋 食谱</text>
-          <view v-for="r in planAllRecipes" :key="r.id" class="plan-recipe-chip"
-            :class="{ selected: planRecipeId === r.id }" @tap="planRecipeId = r.id; planFoodId = 0">
-            <text class="prc-name">{{ r.name }}</text>
-            <text class="prc-kcal">{{ r.totalKcal }}千卡</text>
-          </view>
-        </scroll-view>
-        <view v-if="planFoodId" class="plan-grams-row">
-          <text class="plan-grams-label">{{ planFoodName }} · 克数</text>
-          <view class="plan-stepper">
-            <view class="ps-btn" @tap="planGrams = Math.max(1, planGrams - 10)">−</view>
-            <input class="ps-input" type="number" v-model="planGrams" />
-            <view class="ps-btn" @tap="planGrams = planGrams + 10">+</view>
-          </view>
-          <text class="plan-preview-kcal">≈ {{ planPreviewKcal }}千卡</text>
-        </view>
-        <view class="plan-panel-btns">
-          <button class="pp-cancel" @tap="showPlanPicker = false">取消</button>
-          <button v-if="planFoodId" class="pp-confirm" @tap="confirmAddPlan">加食材</button>
-          <button v-else-if="planRecipeId" class="pp-confirm" @tap="confirmAddRecipeToPlan">加食谱</button>
-          <button v-else class="pp-confirm" disabled>请选择食材或食谱</button>
-        </view>
-      </view>
-    </view>
+    <PlanManager v-if="activeList === 'plan'" :date="journal.selectedDate" />
+    <view v-if="journal.undo && journal.undo.date === journal.selectedDate" class="undo-row"><text>{{ journal.undo.label }}</text><button class="text-button" @tap="safely(() => journal.undoDay(), '已恢复')">撤销刚才操作</button></view>
+    <text class="local-note">热量为估算值。数据备份在「我的」。</text>
+    <EntryEditor v-if="editing" :key="editing.entry.id" :entry="editing.entry" @close="editing = null" @save="saveEdit" />
   </view>
 </template>
-
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { onPullDownRefresh } from '@dcloudio/uni-app'
+import { ref, computed, watch } from 'vue'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import CalorieCard from '@/components/CalorieCard.vue'
 import FoodPicker from '@/components/FoodPicker.vue'
-import { useUserStore } from '@/store/user'
-import { useRecordsStore } from '@/store/records'
-import { usePlanStore } from '@/store/plan'
-import { recipes as builtInRecipes } from '@/data/recipes'
-import type { FoodItem } from '@/store/records'
-import foodsData from '@/static/foods.json'
-
-const allFoods = foodsData as any[]
-const userStore = useUserStore()
-const recordsStore = useRecordsStore()
-const planStore = usePlanStore()
-
-const emojiMap: Record<number,string> = {
-  1:'🍚',2:'🍚',3:'🥟',4:'🍜',5:'🍞',6:'🍠',7:'🌽',8:'🥣',9:'🥣',10:'🍜',
-  11:'🍗',12:'🥩',13:'🥚',14:'🦐',15:'🥩',16:'🧈',17:'🫘',18:'🐟',19:'🐟',
-  21:'🥦',22:'🥬',23:'🥬',24:'🍅',25:'🥒',26:'🥔',27:'🫘',28:'🍆',29:'🫑',30:'🥕',
-  31:'🍈',32:'🥬',33:'🍌',34:'🍎',35:'🍉',36:'🍑',37:'🫐',38:'🍐',39:'🍊',
-  41:'🫒',42:'🫒',43:'🥑',44:'🥜',45:'🥜',46:'🫒',47:'🎃',
-}
-function foodEmoji(id: number) { return emojiMap[id] || '🍽️' }
-
+import EntryEditor from '@/components/EntryEditor.vue'
+import PlanManager from '@/components/PlanManager.vue'
+import { useJournalStore } from '@/store/journal'
+import { sumEntries, incompleteNutrition } from '@/utils/nutrition'
+import { groupPlans } from '@/utils/planGroups'
+import { shiftDate } from '@/utils/input'
+import type { FoodItem, MealEntry } from '@/types/journal'
+const journal = useJournalStore()
+const addMode = ref<'record' | 'plan'>('record')
+const activeList = ref<'record' | 'plan'>('record')
+const adding = ref(false)
+function switchList(list: 'record' | 'plan') { activeList.value = list; adding.value = false; manageMode.value = false; selectedIds.value = [] }
+const manageMode = ref(false)
+const selectedIds = ref<string[]>([])
+const editing = ref<{ entry: MealEntry; date: string } | null>(null)
+const day = computed(() => journal.currentDay)
+const planCount = computed(() => groupPlans(day.value.plans, day.value.entries).length)
+const total = computed(() => sumEntries(day.value.entries))
+const isToday = computed(() => journal.selectedDate === journal.today)
+const savedDates = computed(() => Object.keys(journal.data.days).filter(date => journal.data.days[date].entries.length || journal.data.days[date].plans.length).sort().reverse())
 const macroPayload = computed(() => {
-  if (!userStore.nutritionTarget) return undefined
-  const nt = userStore.nutritionTarget; const tt = recordsStore.todayTotal
-  return { carbs:{target:nt.carbs,consumed:tt.carbs}, protein:{target:nt.protein,consumed:tt.protein}, fat:{target:nt.fat,consumed:tt.fat} }
+  const t = day.value.target
+  if (!t) return undefined
+  return { carbs: { target: t.carbs, consumed: total.value.carbs }, protein: { target: t.protein, consumed: total.value.protein }, fat: { target: t.fat, consumed: total.value.fat } }
 })
-
+watch(() => journal.selectedDate, () => { editing.value = null; adding.value = false; selectedIds.value = []; manageMode.value = false })
+onShow(() => journal.refresh())
+onPullDownRefresh(() => { journal.refresh(); uni.stopPullDownRefresh() })
+function openProfile() { uni.switchTab({ url: '/pages/my/index' }) }
+function changeDate(date: string) { safely(() => journal.selectDate(date)) }
+function onDatePick(event: { detail: { value: string } }) { changeDate(event.detail.value) }
+function onSavedPick(event: { detail: { value: string | number } }) { changeDate(savedDates.value[Number(event.detail.value)]) }
+function safely(action: () => void, title?: string) {
+  try { action(); if (title) uni.showToast({ title, icon: 'none' }); return true }
+  catch (e) { uni.showModal({ title: '操作未保存', content: e instanceof Error ? e.message : '请检查本机存储后重试', showCancel: false }); return false }
+}
 function onAddFood(food: FoodItem, grams: number) {
-  planStore.addToPlan({ foodId: food.id, foodName: food.name, grams, category: food.category, kcal: Math.round(food.kcal*grams/100) })
+  if (safely(() => addMode.value === 'record' ? journal.addEntry(journal.selectedDate, food, grams) : journal.addPlan(journal.selectedDate, food, grams), addMode.value === 'record' ? '已保存到所选日期' : '已加入所选日期计划')) adding.value = false
 }
-
-function onDeleteEntry(id: string, foodId: number) {
-  uni.showModal({
-    title: '删除记录', content: '确定删除这条饮食记录吗？',
-    success: (res: any) => { if (res.confirm) { recordsStore.removeEntry(id); planStore.removeByFoodId(foodId) } },
-  })
+function toggleSelect(id: string) { selectedIds.value = selectedIds.value.includes(id) ? selectedIds.value.filter(i => i !== id) : [...selectedIds.value, id] }
+function saveEdit(grams: number) {
+  const saved = editing.value
+  if (saved && safely(() => journal.updateEntry(saved.date, saved.entry.id, grams), '分量已更新')) editing.value = null
 }
-
-function onCamera() { uni.showToast({ title: '即将上线', icon: 'none' }) }
-
-// 记录管理
-const entryManageMode = ref(false)
-const selectedEntryIds = ref<string[]>([])
-
-function toggleEntrySelect(id: string) {
-  const idx = selectedEntryIds.value.indexOf(id)
-  if (idx >= 0) selectedEntryIds.value.splice(idx, 1)
-  else selectedEntryIds.value.push(id)
-}
-
-function batchDeleteEntries() {
-  selectedEntryIds.value.forEach((id) => {
-    const entry = recordsStore.todayEntries.find((e) => e.id === id)
-    if (entry) {
-      recordsStore.removeEntry(id)
-      planStore.removeByFoodId(entry.food.id)
-    }
-  })
-  selectedEntryIds.value = []
-  entryManageMode.value = false
-  uni.showToast({ title: '已删除', icon: 'success' })
-}
-
-// 食谱组全吃
-function eatRecipeGroup(group: any[]) {
-  const allEaten = group.every((item: any) => item.eaten)
-  group.forEach((item: any) => {
-    if (allEaten) {
-      // 全取消
-      if (item.eaten) {
-        planStore.unmarkEaten(item.id)
-        const entries = recordsStore.todayEntries.filter((e: any) => e.food.id === item.foodId)
-        if (entries.length) recordsStore.removeEntry(entries[entries.length - 1].id)
-      }
-    } else {
-      // 全吃
-      if (!item.eaten) {
-        planStore.markEaten(item.id)
-        const food = allFoods.find((f: any) => f.id === item.foodId)
-        if (food) recordsStore.addEntry(food, item.grams)
-      }
-    }
-  })
-}
-
-// hidden recipes 同步
-const hiddenRecipeIds = ref<Set<string>>(new Set())
-try {
-  const d = uni.getStorageSync('hidden-recipes')
-  if (d) hiddenRecipeIds.value = new Set(JSON.parse(d))
-} catch (_) {}
-
-// 计划
-const showPlanPicker = ref(false)
-const planFoodId = ref(0)
-const planGrams = ref(100)
-const planRecipeId = ref('')
-const planCategories = [
-  { key:'staple',label:'主食'},{key:'protein',label:'蛋白质'},{key:'vegetable',label:'蔬菜'},{key:'fruit',label:'水果'},{key:'fat',label:'油脂'},
-]
-const customRecipes = ref<any[]>([])
-try { const d=uni.getStorageSync('custom-recipes'); if(d) customRecipes.value=JSON.parse(d) } catch(_){}
-const planAllRecipes = computed(() => {
-  const all = [...builtInRecipes, ...customRecipes.value]
-  return all.filter((r) => !hiddenRecipeIds.value.has(r.id))
-})
-
-const groupedPlanItems = computed(() => {
-  const items=planStore.planItems; const groups:any[]=[]; let cg:string|undefined; let ci:any[]=[]
-  for(const item of items){ if(item.groupName!==cg){ if(ci.length) groups.push([...ci]); cg=item.groupName; ci=[item] } else ci.push(item) }
-  if(ci.length) groups.push([...ci]); return groups
-})
-function getPlanEmoji(id:number){ return emojiMap[id]||'🍽️' }
-function getFoodsByCat(cat:string){ return allFoods.filter((f:any)=>f.category===cat) }
-const planFoodName = computed(()=>{ const f=allFoods.find((f:any)=>f.id===planFoodId.value); return f?.name||'' })
-const planPreviewKcal = computed(()=>{ const f=allFoods.find((f:any)=>f.id===planFoodId.value); return f?Math.round(f.kcal*planGrams.value/100):0 })
-
-function confirmAddPlan(){
-  if(!planFoodId.value)return
-  const food=allFoods.find((f:any)=>f.id===planFoodId.value)
-  if(!food)return
-  planStore.addToPlan({foodId:food.id,foodName:food.name,grams:Number(planGrams.value)||100,category:food.category,kcal:Math.round(food.kcal*(Number(planGrams.value)||100)/100)})
-  planStore.rememberGrams(food.id,Number(planGrams.value)||100)
-  showPlanPicker.value=false;planFoodId.value=0;planGrams.value=100
-}
-function confirmAddRecipeToPlan(){
-  if(!planRecipeId.value)return
-  const r=planAllRecipes.value.find((x:any)=>x.id===planRecipeId.value)
-  if(!r)return
-  const items=r.ingredients.map((ing:any)=>{const food=allFoods.find((f:any)=>f.id===ing.foodId);return {foodId:ing.foodId,name:food?.name||'未知',grams:ing.grams,kcal:food?Math.round(food.kcal*ing.grams/100):0,category:food?.category||'staple',emoji:emojiMap[ing.foodId]||'🍽️'}})
-  planStore.addRecipeGroup(r.name,items)
-  showPlanPicker.value=false;planRecipeId.value=''
-}
-onPullDownRefresh(() => {
-  recordsStore.loadToday()
-  planStore.loadPlan()
-  try { const d = uni.getStorageSync('custom-recipes'); if (d) customRecipes.value = JSON.parse(d) } catch (_) {}
-  try { const h = uni.getStorageSync('hidden-recipes'); if (h) hiddenRecipeIds.value = new Set(JSON.parse(h)) } catch (_) {}
-  uni.stopPullDownRefresh()
-})
-
-function eatItem(item:any){
-  if(item.eaten){ planStore.unmarkEaten(item.id); const entries=recordsStore.todayEntries.filter((e:any)=>e.food.id===item.foodId); if(entries.length) recordsStore.removeEntry(entries[entries.length-1].id) }
-  else { planStore.markEaten(item.id); const food=allFoods.find((f:any)=>f.id===item.foodId); if(food) recordsStore.addEntry(food,item.grams) }
+function deleteSelected() {
+  const ids = [...selectedIds.value], date = journal.selectedDate, revision = journal.revision
+  uni.showModal({ title: '删除饮食记录', content: '删除选中的 '+ids.length+' 条记录？摄入将重新汇总，关联计划变为待吃。本页可撤销。', confirmText: '删除', confirmColor: '#ac513b', success: result => {
+    if (!result.confirm) return
+    if (date !== journal.selectedDate || revision !== journal.revision) { uni.showToast({ title: '数据已变化，请重新选择', icon: 'none' }); return }
+    if (safely(() => journal.deleteEntries(date,ids), '记录已删除')) { selectedIds.value = []; manageMode.value = false }
+  } })
 }
 </script>
-
 <style scoped>
-.record-page { padding: 24rpx; padding-bottom: 120rpx; }
-.camera-bar { display: flex; align-items: center; gap: 8rpx; background: #fff; border: 1px dashed #ccc; border-radius: 12rpx; padding: 16rpx 20rpx; margin-bottom: 16rpx; }
-.camera-icon-text { font-size: 28rpx; }
-.camera-label { font-size: 26rpx; color: #4d4d4d; flex: 1; }
-.camera-badge { font-size: 20rpx; color: #8c8c8c; background: #f5f5f5; padding: 4rpx 10rpx; border-radius: 4rpx; }
-
-/* 计划区 */
-.plan-section { background: #fff; border-radius: 16rpx; padding: 24rpx; margin-bottom: 16rpx; box-shadow: 0 2rpx 12rpx rgba(0,0,0,.04); }
-.plan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx; }
-.plan-title { font-size: 28rpx; font-weight: 600; color: #1a1a1a; }
-.plan-add-btn { font-size: 24rpx; color: #07c160; font-weight: 500; padding: 6rpx 16rpx; border: 1px solid #07c160; border-radius: 20rpx; }
-.plan-group-head { display: flex; justify-content: space-between; align-items: center; padding: 8rpx 0 4rpx; }
-.plan-group-label { font-size: 22rpx; color: #8c8c8c; font-weight: 500; }
-.plan-group-eat {
-  font-size: 20rpx; color: #07c160; font-weight: 500;
-  padding: 3rpx 12rpx; border: 1px solid #07c160; border-radius: 10rpx;
-}
-.plan-item { display: flex; align-items: center; gap: 10rpx; padding: 12rpx 0; border-bottom: 1px solid #f8f8f8; }
-.plan-item.eaten { opacity: .5; }
-.plan-emoji { font-size: 28rpx; }
-.plan-name { flex: 1; font-size: 24rpx; color: #1a1a1a; font-weight: 500; }
-.plan-grams { font-size: 22rpx; color: #8c8c8c; }
-.plan-kcal { font-size: 22rpx; color: #4d4d4d; }
-.plan-eat-btn { font-size: 22rpx; color: #07c160; font-weight: 500; padding: 4rpx 12rpx; border: 1px solid #07c160; border-radius: 12rpx; }
-.plan-eat-btn.done { color: #fff; background: #07c160; border-color: #07c160; }
-.plan-del { font-size: 24rpx; color: #ccc; padding: 4rpx 8rpx; }
-.plan-empty-hint { font-size: 24rpx; color: #8c8c8c; text-align: center; padding: 20rpx 0; }
-
-/* 记录列表 */
-.today-section { background: #fff; border-radius: 16rpx; padding: 24rpx; box-shadow: 0 2rpx 12rpx rgba(0,0,0,.04); }
-.section-label { font-size: 26rpx; font-weight: 600; color: #1a1a1a; display: block; margin-bottom: 12rpx; }
-.empty-list { padding: 48rpx 24rpx; text-align: center; }
-.empty-text { font-size: 28rpx; color: #4d4d4d; font-weight: 500; display: block; }
-.entry-item { display: flex; align-items: center; gap: 14rpx; padding: 14rpx 0; border-bottom: 1px solid #f8f8f8; }
-.entry-emoji { font-size: 28rpx; }
-.entry-info { flex: 1; display: flex; flex-direction: column; gap: 2rpx; }
-.entry-name { font-size: 26rpx; color: #1a1a1a; font-weight: 600; }
-.entry-grams { font-size: 22rpx; color: #999; }
-.entry-kcal { font-size: 26rpx; color: #4d4d4d; font-weight: 500; }
-.entry-delete { font-size: 28rpx; color: #ccc; padding: 8rpx; }
-.section-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx; }
-.entry-mgr-btn { font-size: 22rpx; color: #8c8c8c; padding: 4rpx 12rpx; border: 1px solid #ccc; border-radius: 12rpx; }
-.entry-del-all { font-size: 22rpx; color: #e74c3c; padding: 4rpx 12rpx; }
-.entry-mg { }
-.entry-check {
-  width: 32rpx; height: 32rpx; border-radius: 50%; border: 2rpx solid #ccc;
-  display: flex; align-items: center; justify-content: center; font-size: 18rpx; color: #07c160; flex-shrink: 0;
-}
-.entry-check.checked { border-color: #07c160; background: #e8f5e9; }
-.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 24rpx; border-top: 1px solid #f0f0f0; text-align: center; padding-bottom: calc(20rpx + env(safe-area-inset-bottom)); }
-.bottom-total { font-size: 28rpx; font-weight: 600; color: #1a1a1a; }
-.bottom-total.over { color: #e74c3c; }
-
-/* 弹窗 */
-.plan-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,.4); z-index:200; display:flex; align-items:flex-end; }
-.plan-panel { background:#fff; border-radius:24rpx 24rpx 0 0; padding:32rpx 24rpx; width:100%; max-height:80vh; display:flex; flex-direction:column; }
-.plan-panel-title { font-size:30rpx; font-weight:600; color:#1a1a1a; text-align:center; margin-bottom:16rpx; display:block; }
-.plan-food-list { max-height:50vh; margin-bottom:16rpx; }
-.plan-cat-label { font-size:24rpx; color:#8c8c8c; padding:12rpx 0 8rpx; display:block; }
-.plan-food-grid { display:flex; flex-wrap:wrap; gap:10rpx; }
-.plan-food-chip { padding:10rpx 18rpx; border-radius:20rpx; font-size:24rpx; color:#4d4d4d; background:#f5f5f5; }
-.plan-food-chip.selected { background:#e8f5e9; color:#2e7d32; font-weight:600; }
-.plan-recipe-chip { display:flex; justify-content:space-between; align-items:center; background:#f8f8f8; padding:14rpx 18rpx; border-radius:12rpx; margin-bottom:10rpx; }
-.plan-recipe-chip.selected { background:#e8f5e9; }
-.prc-name { font-size:26rpx; color:#1a1a1a; font-weight:500; }
-.prc-kcal { font-size:22rpx; color:#8c8c8c; }
-.plan-grams-row { display:flex; align-items:center; gap:12rpx; padding:16rpx 0; }
-.plan-grams-label { font-size:26rpx; color:#1a1a1a; font-weight:500; }
-.plan-stepper { display:flex; align-items:center; border:1px solid #e0e0e0; border-radius:10rpx; overflow:hidden; }
-.ps-btn { width:56rpx; height:60rpx; display:flex; align-items:center; justify-content:center; background:#f8f8f8; font-size:32rpx; color:#4d4d4d; }
-.ps-input { width:100rpx; height:60rpx; text-align:center; font-size:28rpx; font-weight:600; }
-.plan-preview-kcal { font-size:24rpx; color:#07c160; }
-.plan-panel-btns { display:flex; gap:12rpx; margin-top:20rpx; }
-.pp-cancel { flex:1; height:80rpx; line-height:80rpx; background:#f5f5f5; border-radius:16rpx; font-size:28rpx; color:#8c8c8c; border:none; }
-.pp-cancel::after { border:none; }
-.pp-confirm { flex:2; height:80rpx; line-height:80rpx; background:#07c160; border-radius:16rpx; font-size:28rpx; color:#fff; font-weight:600; border:none; }
-.pp-confirm::after { border:none; }
-.pp-confirm[disabled] { background:#c0c0c0; }
+.record-page { max-width:960rpx; margin:0 auto; padding:12rpx 36rpx 32rpx; padding-bottom:calc(32rpx + env(safe-area-inset-bottom)); }
+.date-bar { display:flex; align-items:center; justify-content:space-between; gap:8rpx; }
+.date-bar button { margin:0; width:88rpx; min-height:44px; line-height:44px; background:transparent; color:var(--ink); font-size:40rpx; padding:0; }
+.date-value { padding:20rpx 0; font-size:max(30rpx,15px); font-weight:600; }
+.date-tools { display:flex; justify-content:space-between; align-items:center; min-height:44px; border-bottom:1px solid var(--line); }
+.target-link { color:var(--muted); font-size:max(24rpx,12px); padding:16rpx 0; }
+.history-banner,.error-banner { background:#fff4e5; color:#795725; padding:20rpx; margin:16rpx 0; border-radius:8rpx; font-size:max(24rpx,12px); }
+.simple-summary { padding:32rpx 0; display:flex; align-items:center; justify-content:space-between; }
+.summary-label { display:block; color:var(--muted); font-size:max(24rpx,12px); }.summary-value { display:block; font-size:64rpx; font-weight:600; }.summary-unit { font-size:24rpx; font-weight:400; }
+.journal-toolbar { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); gap:12rpx; }
+.journal-tabs { display:flex; gap:28rpx; }.journal-tabs button { border-radius:0; padding:18rpx 0; background:transparent; margin:0; font-size:max(30rpx,15px); color:var(--muted); line-height:1.8; min-height:44px; border-bottom:2px solid transparent; }
+.journal-tabs button.active { color:var(--ink); font-weight:600; border-bottom-color:var(--brand); }.journal-tabs text { font-size:max(24rpx,12px); font-weight:400; margin-left:6rpx; }
+.add-button { background:var(--brand); color:#fff; border-radius:10rpx; font-size:max(26rpx,13px); padding:0 22rpx; margin:0; line-height:44px; min-height:44px; white-space:nowrap; }
+.add-panel { padding-top:24rpx; border-bottom:1px solid var(--line); }.add-heading { display:flex; justify-content:space-between; gap:8rpx; margin-bottom:20rpx; font-size:max(28rpx,14px); }.add-date { color:var(--muted); font-size:max(24rpx,12px); }
+.section-head { display:flex; align-items:center; justify-content:space-between; min-height:88rpx; }.section-caption { color:var(--muted); font-size:max(24rpx,12px); }
+.text-button { background:transparent; color:var(--brand); font-size:max(26rpx,13px); line-height:44px; min-height:44px; padding:0 8rpx; margin:0; white-space:nowrap; }
+.empty-state { padding:60rpx 0; color:var(--muted); font-size:max(26rpx,13px); }.empty-title { display:block; color:var(--ink); font-size:max(30rpx,15px); margin-bottom:12rpx; }
+.entry-row { display:flex; align-items:center; gap:16rpx; padding:14rpx 0; border-bottom:1px solid var(--line); min-height:130rpx; }
+.entry-info { flex:1; min-width:0; }.entry-name { display:block; font-size:max(30rpx,15px); font-weight:500; overflow-wrap:anywhere; }.entry-meta { display:block; font-size:max(24rpx,12px); color:var(--muted); margin-top:4rpx; }.source-label { margin-left:16rpx; }
+.entry-actions { display:flex; align-items:center; gap:16rpx; }.entry-kcal { font-size:max(30rpx,15px); }.entry-kcal text { font-size:max(22rpx,11px); color:var(--muted); }.entry-actions .text-button { font-size:max(24rpx,12px); }
+.check { border:1px solid #9aaa9f; border-radius:6rpx; width:40rpx; height:40rpx; flex-shrink:0; text-align:center; }.check.checked { background:var(--brand); color:white; }
+.delete-button { margin-top:20rpx; color:#a34831; background:#fbede6; line-height:44px; font-size:28rpx; border-radius:10rpx; }
+.undo-row { display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:#edf4ef; padding:12rpx 20rpx; border-radius:8rpx; margin-top:24rpx; font-size:max(24rpx,12px); }
+.local-note { font-size:max(22rpx,11px); }
+@media(max-width:350px) { .record-page { padding-left:28rpx; padding-right:28rpx; }.entry-actions { gap:8rpx; }.journal-tabs { gap:20rpx; } }
 </style>

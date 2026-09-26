@@ -3,7 +3,7 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "减脂助手",
+        "navigationBarTitleText": "一口一口瘦",
         "navigationBarBackgroundColor": "#FFFFFF",
         "navigationBarTextStyle": "black"
       }
@@ -19,7 +19,7 @@
     {
       "path": "pages/recipe/index",
       "style": {
-        "navigationBarTitleText": "推荐食谱",
+        "navigationBarTitleText": "日常食谱",
         "navigationBarBackgroundColor": "#FFFFFF",
         "navigationBarTextStyle": "black"
       }
@@ -34,8 +34,8 @@
     }
   ],
   "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#07C160",
+    "color": "#69716c",
+    "selectedColor": "#28745b",
     "borderStyle": "white",
     "backgroundColor": "#FFFFFF",
     "list": [
@@ -68,7 +68,7 @@
   "globalStyle": {
     "navigationBarBackgroundColor": "#FFFFFF",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F6F6F6",
+    "backgroundColor": "#FFFFFF",
     "enablePullDownRefresh": true
   }
 }

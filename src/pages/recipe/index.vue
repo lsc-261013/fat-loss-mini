@@ -1,31 +1,32 @@
 <template>
+  <page-meta :page-style="showRecipeBuilder ? 'overflow: hidden;' : ''" />
   <view class="recipe-page">
-    <!-- 缺口概览 -->
+    <!-- Summary -->
     <view v-if="userStore.nutritionTarget" class="gap-card">
-      <text class="gap-title">今日剩余</text>
+      <text class="gap-title">今天距参考目标</text>
       <view class="gap-numbers">
         <view class="gap-item">
           <text class="gap-value" :class="{ over: remainingKcal < 0 }">{{ Math.abs(remainingKcal) }}</text>
-          <text class="gap-label">{{ remainingKcal >= 0 ? '剩余千卡' : '已超千卡' }}</text>
+          <text class="gap-label">{{ remainingKcal >= 0 ? '千卡' : '高于目标 / 千卡' }}</text>
         </view>
         <view class="gap-divider" />
         <view class="gap-item">
-          <text class="gap-value" :class="remainingCarbs < 0 ? 'over' : 'ok'">{{ Math.abs(remainingCarbs) }}</text>
-          <text class="gap-label">{{ remainingCarbs >= 0 ? '碳剩余g' : '碳已超g' }}</text>
+          <text class="gap-value" :class="remainingCarbs !== null && remainingCarbs < 0 ? 'over' : 'ok'">{{ remainingCarbs === null ? '—' : Math.abs(remainingCarbs) }}</text>
+          <text class="gap-label">{{ remainingCarbs === null ? '碳水未完善' : remainingCarbs >= 0 ? '碳水余量 g' : '碳水超出 g' }}</text>
         </view>
         <view class="gap-divider" />
         <view class="gap-item">
-          <text class="gap-value" :class="remainingProtein < 0 ? 'over' : 'ok'">{{ Math.abs(remainingProtein) }}</text>
-          <text class="gap-label">{{ remainingProtein >= 0 ? '蛋剩余g' : '蛋已超g' }}</text>
+          <text class="gap-value" :class="remainingProtein !== null && remainingProtein < 0 ? 'over' : 'ok'">{{ remainingProtein === null ? '—' : Math.abs(remainingProtein) }}</text>
+          <text class="gap-label">{{ remainingProtein === null ? '蛋白未完善' : remainingProtein >= 0 ? '蛋白余量 g' : '蛋白超出 g' }}</text>
         </view>
       </view>
     </view>
 
     <view class="section-header">
-      <text class="section-title">推荐食谱</text>
+      <view><text class="section-title">全部食谱</text><text class="recipe-hint">加入今天计划，吃过再确认</text></view>
       <view style="display:flex;gap:12rpx;">
-        <text class="section-mgr-btn" @tap="manageMode = !manageMode">{{ manageMode ? '完成' : '管理' }}</text>
-        <text class="section-add-btn" @tap="showRecipeBuilder = true">+ 自建</text>
+        <button class="section-mgr-btn" @tap="manageMode = !manageMode">{{ manageMode ? '完成' : '管理' }}</button>
+        <button class="section-add-btn" @tap="showRecipeBuilder = true">自建</button>
       </view>
     </view>
 
@@ -36,22 +37,21 @@
       <view class="meal-header">
         <view class="meal-title-row">
           <text class="meal-time-tag">{{ r.mealTime ? mealTimeLabel(r.mealTime) : '自定义' }}</text>
-          <text class="meal-name">{{ r.name }}</text>
+          <text class="meal-name">{{ r.name.replace(/^(早餐|午餐|晚餐|加餐)[：:]/, '') }}</text>
         </view>
         <view class="meal-type-badge" :class="r.type || 'standard'">{{ typeLabel(r.type || 'standard') }}</view>
       </view>
 
       <view class="meal-ingredients">
-        <view v-for="ing in getIngredientLabels(r)" :key="ing.foodId" class="ingredient-chip">
-          <text class="ing-emoji">{{ ing.emoji }}</text>
+        <view v-for="ing in getIngredientLabels(r)" :key="ing.index" class="ingredient-chip">
           <text class="ing-text">{{ ing.name }} {{ ing.grams }}g</text>
         </view>
       </view>
 
       <view class="meal-footer">
-        <text class="meal-kcal">{{ r.totalKcal }}千卡</text>
-        <text class="meal-add-plan" @tap.stop="addRecipeToPlan(r)">+ 加入计划</text>
-        <text v-if="!manageMode" class="meal-del-one" @tap.stop="deleteOneRecipe(r.id)">×</text>
+        <text class="meal-kcal">{{ Math.round(r.totalKcal) }}千卡</text>
+        <button v-if="!manageMode" class="meal-add-plan" @tap.stop="addRecipeToPlan(r)">加入计划</button>
+        <button v-if="manageMode" class="meal-del-one" @tap.stop="deleteOneRecipe(r.id)">删除</button>
       </view>
     </view>
 
@@ -63,24 +63,26 @@
       <text class="empty-text">{{ emptyMessage }}</text>
     </view>
 
-    <!-- 食谱详情弹窗 -->
+    <button v-if="deletedRecipes" class="secondary-action" @tap="undoRecipeDelete">撤销最近一次删除</button>
+    <!-- Details -->
     <view v-if="detailRecipe" class="detail-overlay" @tap="detailRecipe = null">
       <view class="detail-panel" @tap.stop>
         <text class="detail-title">{{ detailRecipe.name }}</text>
-        <text class="detail-kcal">≈ {{ detailRecipe.totalKcal }} 千卡</text>
-        <text class="detail-sub">点击食材可替换</text>
+        <text class="detail-kcal">≈ {{ Math.round(detailRecipe.totalKcal) }} 千卡</text>
+        <text class="detail-sub">点击食材可替换；预设食谱会另存为我的搭配</text>
+        <text v-if="detailRecipe.totalCarbs === null || detailRecipe.totalProtein === null || detailRecipe.totalFat === null" class="detail-sub">部分食材营养数据未完善，热量可正常计算。</text>
 
         <view class="detail-ingredients">
           <view
             v-for="ing in getIngredientLabels(detailRecipe)"
-            :key="ing.foodId"
+            :key="ing.index"
             class="detail-ing-row"
             @tap="showSwapOptions(ing)"
           >
             <view class="ing-icon-dot" :class="ing.category" />
             <text class="ding-name">{{ ing.name }}</text>
             <text class="ding-grams">{{ ing.grams }}g</text>
-            <text class="ding-kcal">≈ {{ ing.kcal }}千卡</text>
+            <text class="ding-kcal">≈ {{ Math.round(ing.kcal) }}千卡</text>
             <text class="ding-swap-hint">替换 ›</text>
           </view>
         </view>
@@ -99,7 +101,7 @@
           <view class="swap-stepper">
             <view class="ss-btn" @tap="swapGrams = Math.max(1, swapGrams - 10)">−</view>
             <input class="ss-input" type="number" v-model="swapGrams" />
-            <view class="ss-btn" @tap="swapGrams = swapGrams + 10">+</view>
+            <view class="ss-btn" @tap="swapGrams = Number(swapGrams) + 10">+</view>
           </view>
           <text class="swap-preview">≈ {{ swapKcal }}千卡</text>
         </view>
@@ -122,72 +124,25 @@
       </view>
     </view>
 
-    <!-- 自建菜谱弹窗 -->
-    <view v-if="showRecipeBuilder" class="detail-overlay" @tap="showRecipeBuilder = false">
-      <view class="swap-panel" @tap.stop style="max-height:85vh;overflow-y:auto;">
-        <text class="swap-title">自建菜谱</text>
-
-        <input class="builder-name-input" v-model="builderName" placeholder="输入菜谱名称" />
-
-        <text class="swap-hint">已选食材</text>
-        <view v-for="(item, idx) in builderItems" :key="idx" class="builder-chip">
-          <text>{{ item.name }} {{ item.grams }}g ≈{{ item.kcal }}千卡</text>
-          <text class="plan-del" @tap="removeBuilderItem(idx)">×</text>
-        </view>
-
-        <text class="swap-hint" style="margin-top:16rpx;">添加食材</text>
-        <scroll-view scroll-y style="max-height:280rpx;">
-          <view v-for="cat in [{k:'staple',l:'主食',emoji:'🍚'},{k:'protein',l:'蛋白质',emoji:'🍗'},{k:'vegetable',l:'蔬菜',emoji:'🥬'},{k:'fruit',l:'水果',emoji:'🍎'},{k:'fat',l:'油脂',emoji:'🫒'}]" :key="cat.k">
-            <view class="builder-cat-head" @tap="toggleCat(cat.k)">
-              <text class="builder-cat-emoji">{{ cat.emoji }}</text>
-              <text class="builder-cat-label">{{ cat.l }}</text>
-              <text class="builder-cat-arrow">{{ openCats.includes(cat.k) ? '▾' : '▸' }}</text>
-            </view>
-            <view v-if="openCats.includes(cat.k)" class="builder-food-grid">
-              <view
-                v-for="f in allFoods.filter((x:any) => x.category === cat.k)"
-                :key="f.id"
-                class="builder-food-chip"
-                :class="{ selected: builderFoodId === f.id }"
-                @tap="builderFoodId = f.id; builderGrams = planStore.getRememberedGrams(f.id) || 100"
-              >
-                <text class="bfc-emoji">{{ emojiMap[f.id] || '🍽️' }}</text>
-                <text class="bfc-name">{{ f.name }}</text>
-                <text class="bfc-kcal">{{ f.kcal }}/100g</text>
-              </view>
-            </view>
-          </view>
-        </scroll-view>
-
-        <view v-if="builderFoodId" class="plan-grams-row">
-          <text class="plan-grams-label">克数</text>
-          <view class="plan-stepper">
-            <view class="ps-btn" @tap="builderGrams = Math.max(1, builderGrams - 10)">−</view>
-            <input class="ps-input" type="number" v-model="builderGrams" />
-            <view class="ps-btn" @tap="builderGrams = builderGrams + 10">+</view>
-          </view>
-          <button class="plan-add-btn" style="border:none;background:#e8f5e9;color:#2e7d32;font-size:22rpx;padding:8rpx 14rpx;border-radius:8rpx;" @tap="addBuilderItem">加入</button>
-        </view>
-
-        <view class="plan-panel-btns" style="margin-top:20rpx;">
-          <button class="pp-cancel" @tap="showRecipeBuilder = false; builderItems = []; builderName = '';">取消</button>
-          <button class="pp-confirm" @tap="saveCustomRecipe">保存菜谱</button>
-        </view>
-      </view>
-    </view>
+    <RecipeBuilder v-if="showRecipeBuilder" @close="showRecipeBuilder = false" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useJournalStore } from '@/store/journal'
+import { calculatedRecipe, foodPortion } from '@/utils/nutrition'
 import { ref, computed } from 'vue'
+import RecipeBuilder from '@/components/RecipeBuilder.vue'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
+import { validGrams } from '@/utils/input'
 import { useUserStore } from '@/store/user'
 import { useRecordsStore } from '@/store/records'
 import { usePlanStore } from '@/store/plan'
 import { recipes } from '@/data/recipes'
 import type { Recipe } from '@/data/recipes'
-import foodsData from '@/static/foods.json'
 
-const allFoods = foodsData as any[]
+
+const allFoods = computed(() => journal.allFoods)
 const emojiMap: Record<number, string> = {
   1:'🍚',2:'🍚',3:'🥟',4:'🍜',5:'🍞',6:'🍠',7:'🌽',8:'🥣',9:'🥣',10:'🍜',
   11:'🍗',12:'🥩',13:'🥚',14:'🦐',15:'🥩',16:'🧈',17:'🫘',18:'🐟',19:'🐟',
@@ -196,6 +151,7 @@ const emojiMap: Record<number, string> = {
   41:'🫒',42:'🫒',43:'🥑',44:'🥜',45:'🥜',46:'🫒',47:'🎃',
 }
 
+const journal = useJournalStore()
 const userStore = useUserStore()
 const recordsStore = useRecordsStore()
 const planStore = usePlanStore()
@@ -205,23 +161,14 @@ const swapOptions = ref<any[]>([])
 const swapGrams = ref(100)
 const swapKcal = computed(() => {
   if (!swapping.value) return 0
-  const food = allFoods.find((f: any) => f.id === swapping.value.foodId)
+  const food = allFoods.value.find((f: any) => f.id === swapping.value.foodId)
   return food ? Math.round(food.kcal * swapGrams.value / 100) : 0
 })
 
 // 管理 + 隐藏食谱
 const manageMode = ref(false)
 const selectedIds = ref<string[]>([])
-const hiddenRecipeIds = ref<Set<string>>(new Set())
-
-try {
-  const d = uni.getStorageSync('hidden-recipes')
-  if (d) hiddenRecipeIds.value = new Set(JSON.parse(d))
-} catch (_) {}
-
-function saveHidden() {
-  uni.setStorageSync('hidden-recipes', JSON.stringify([...hiddenRecipeIds.value]))
-}
+const hiddenRecipeIds = computed(() => new Set(journal.data.hiddenRecipeIds))
 
 function toggleSelect(id: string) {
   const idx = selectedIds.value.indexOf(id)
@@ -230,128 +177,61 @@ function toggleSelect(id: string) {
 }
 
 function batchDelete() {
-  selectedIds.value.forEach((id) => hiddenRecipeIds.value.add(id))
-  // 也删自定义菜谱的源数据
-  customRecipes.value = customRecipes.value.filter((r) => !selectedIds.value.includes(r.id))
-  saveCustomRecipes()
-  saveHidden()
+  if (!selectedIds.value.length) return
+  uni.showModal({ title: '删除食谱', content: '删除选中的 ' + selectedIds.value.length + ' 份食谱？本页可撤销最近一次删除。', success: res => { if (res.confirm) deleteRecipes([...selectedIds.value]) } })
+}
+const deletedRecipes = ref<string[] | null>(null)
+function deleteRecipes(ids: string[]) {
+  const next = new Set([...hiddenRecipeIds.value, ...ids])
+  try { journal.mutate(data => { data.hiddenRecipeIds = [...next] }) }
+  catch { uni.showToast({ title: '删除未保存，请重试', icon: 'none' }); return }
+  deletedRecipes.value = ids
   selectedIds.value = []
   manageMode.value = false
   uni.showToast({ title: '已删除', icon: 'success' })
 }
 
 function deleteOneRecipe(id: string) {
-  hiddenRecipeIds.value.add(id)
-  customRecipes.value = customRecipes.value.filter((r) => r.id !== id)
-  saveCustomRecipes()
-  saveHidden()
-  uni.showToast({ title: '已删除', icon: 'success' })
+  uni.showModal({ title: '删除食谱', content: '删除后可在本页撤销，已加入的计划不受影响。', success: res => { if (res.confirm) deleteRecipes([id]) } })
+}
+function undoRecipeDelete() {
+  if (!deletedRecipes.value) return
+  const next = [...hiddenRecipeIds.value].filter(id => !deletedRecipes.value!.includes(id))
+  try { journal.mutate(data => { data.hiddenRecipeIds = next }) }
+  catch { uni.showToast({ title: '恢复未保存，请重试', icon: 'none' }); return }
+  deletedRecipes.value = null
+  uni.showToast({ title: '已恢复', icon: 'success' })
 }
 
 // 自定义菜谱
-const customRecipes = ref<Recipe[]>([])
+const customRecipes = computed(() => journal.data.customRecipes)
 const showRecipeBuilder = ref(false)
-const builderName = ref('')
-const builderItems = ref<{ foodId: number; name: string; grams: number; kcal: number; category: string }[]>([])
-const builderFoodId = ref(0)
-const builderGrams = ref(100)
-const openCats = ref<string[]>(['staple', 'protein', 'vegetable', 'fruit', 'fat'])
-
-function toggleCat(cat: string) {
-  const idx = openCats.value.indexOf(cat)
-  if (idx >= 0) openCats.value.splice(idx, 1)
-  else openCats.value.push(cat)
-}
-
-function loadCustomRecipes() {
-  try {
-    const d = uni.getStorageSync('custom-recipes')
-    if (d) customRecipes.value = JSON.parse(d)
-  } catch (_) {}
-}
-function saveCustomRecipes() {
-  uni.setStorageSync('custom-recipes', JSON.stringify(customRecipes.value))
-}
-loadCustomRecipes()
+function loadCustomRecipes() { journal.refresh() }
+onShow(() => { recordsStore.loadToday(); planStore.loadPlan() })
+onPullDownRefresh(() => { recordsStore.loadToday(); planStore.loadPlan(); loadCustomRecipes(); uni.stopPullDownRefresh() })
 
 
 // 合并系统+自定义
 const allRecipes = computed(() => {
-  const all = [...recipes, ...customRecipes.value]
+  const all = [...recipes, ...customRecipes.value.map(recipe => calculatedRecipe(recipe, allFoods.value))]
   return all.filter((r) => !hiddenRecipeIds.value.has(r.id))
 })
 
 function addRecipeToPlan(r: Recipe) {
   const items = r.ingredients.map((ing) => {
-    const food = allFoods.find((f: any) => f.id === ing.foodId)
+    const food = allFoods.value.find((f: any) => f.id === ing.foodId)
     return {
       foodId: ing.foodId,
       name: food?.name || '未知',
       grams: ing.grams,
-      kcal: food ? Math.round(food.kcal * ing.grams / 100) : 0,
+      kcal: food ? foodPortion(food, ing.grams).subtotalKcal : 0,
       category: food?.category || 'staple',
       emoji: emojiMap[ing.foodId] || '🍽️',
     }
   })
-  planStore.addRecipeGroup(r.name, items)
+  try { planStore.addRecipeGroup(r.name, items) }
+  catch { uni.showToast({ title: '计划未保存，请检查存储后重试', icon: 'none' }); return }
   uni.showToast({ title: `已把「${r.name}」加入计划`, icon: 'none' })
-}
-
-function addBuilderItem() {
-  if (!builderFoodId.value) return
-  const food = allFoods.find((f: any) => f.id === builderFoodId.value)
-  if (!food) return
-  const g = Number(builderGrams.value) || 100
-  builderItems.value.push({
-    foodId: food.id,
-    name: food.name,
-    grams: g,
-    kcal: Math.round(food.kcal * g / 100),
-    category: food.category,
-  })
-  builderFoodId.value = 0
-  builderGrams.value = 100
-}
-
-function removeBuilderItem(idx: number) {
-  builderItems.value.splice(idx, 1)
-}
-
-function saveCustomRecipe() {
-  if (!builderName.value.trim() || builderItems.value.length === 0) {
-    uni.showToast({ title: '请填写菜名并添加食材', icon: 'none' })
-    return
-  }
-  const totalKcal = builderItems.value.reduce((s, i) => s + i.kcal, 0)
-  const totalCarbs = builderItems.value.reduce((s, i) => {
-    const f = allFoods.find((f: any) => f.id === i.foodId)
-    return s + Math.round((f?.carbs || 0) * i.grams / 100)
-  }, 0)
-  const totalProtein = builderItems.value.reduce((s, i) => {
-    const f = allFoods.find((f: any) => f.id === i.foodId)
-    return s + Math.round((f?.protein || 0) * i.grams / 100)
-  }, 0)
-  const totalFat = builderItems.value.reduce((s, i) => {
-    const f = allFoods.find((f: any) => f.id === i.foodId)
-    return s + Math.round((f?.fat || 0) * i.grams / 100)
-  }, 0)
-  customRecipes.value.push({
-    id: 'custom_' + Date.now(),
-    name: builderName.value.trim(),
-    type: 'standard',
-    mealTime: 'lunch',
-    ingredients: builderItems.value.map((i) => ({ foodId: i.foodId, grams: i.grams })),
-    totalKcal,
-    totalCarbs,
-    totalProtein,
-    totalFat,
-    description: `${builderItems.value.length}种食材`,
-  })
-  saveCustomRecipes()
-  showRecipeBuilder.value = false
-  builderName.value = ''
-  builderItems.value = []
-  uni.showToast({ title: '菜谱已保存', icon: 'success' })
 }
 
 const remainingKcal = computed(() => {
@@ -360,29 +240,13 @@ const remainingKcal = computed(() => {
 })
 const remainingCarbs = computed(() => {
   if (!userStore.nutritionTarget) return 0
-  return Math.round(userStore.nutritionTarget.carbs - recordsStore.todayTotal.carbs)
+  return recordsStore.todayTotal.carbs === null ? null : Math.round(userStore.nutritionTarget.carbs - recordsStore.todayTotal.carbs)
 })
 const remainingProtein = computed(() => {
   if (!userStore.nutritionTarget) return 0
-  return Math.round(userStore.nutritionTarget.protein - recordsStore.todayTotal.protein)
+  return recordsStore.todayTotal.protein === null ? null : Math.round(userStore.nutritionTarget.protein - recordsStore.todayTotal.protein)
 })
 
-const recommendedRecipes = computed<Recipe[]>(() => {
-  if (!userStore.nutritionTarget) return []
-  const kcal = remainingKcal.value
-  if (kcal <= 0) return []
-  const scored = recipes.map((r) => {
-    let score = 0
-    if (r.totalKcal <= kcal + 50) score += 30
-    else if (r.totalKcal <= kcal + 150) score += 15
-    if (remainingProtein.value > 10 && r.totalProtein >= remainingProtein.value * 0.5) score += 25
-    if (kcal > 400 && r.type === 'rich') score += 15
-    if (kcal <= 200 && r.type === 'light') score += 15
-    return { recipe: r, score }
-  })
-  scored.sort((a, b) => b.score - a.score)
-  return scored.slice(0, 3).map((s) => s.recipe)
-})
 
 const emptyMessage = computed(() => '暂无食谱，点击「+ 自建」创建')
 
@@ -396,13 +260,14 @@ function typeLabel(t: string) {
 }
 
 function getIngredientLabels(r: Recipe) {
-  return r.ingredients.map((ing) => {
-    const food = allFoods.find((f: any) => f.id === ing.foodId)
+  return r.ingredients.map((ing, index) => {
+    const food = allFoods.value.find((f: any) => f.id === ing.foodId)
     return {
+      index,
       foodId: ing.foodId,
       name: food?.name || '未知',
       grams: ing.grams,
-      kcal: food ? Math.round(food.kcal * ing.grams / 100) : 0,
+      kcal: food ? foodPortion(food, ing.grams).subtotalKcal : 0,
       category: food?.category || 'staple',
       emoji: emojiMap[ing.foodId] || '🍽️',
     }
@@ -415,127 +280,64 @@ function openDetail(r: Recipe) {
 
 function showSwapOptions(ing: any) {
   swapping.value = ing
+  swapGrams.value = ing.grams
   // 同类食材作为替换选项
-  swapOptions.value = allFoods.filter(
+  swapOptions.value = allFoods.value.filter(
     (f: any) => f.category === ing.category && f.id !== ing.foodId
   )
 }
 
-function doSwap(alt: any) {
-  const g = Number(swapGrams.value) || 100
-  const kcal = Math.round(alt.kcal * g / 100)
-  uni.showToast({
-    title: `已替换为${alt.name} ${g}g ≈${kcal}千卡`,
-    icon: 'none',
-    duration: 2000,
-  })
-  swapping.value = null
-  detailRecipe.value = null
+function doSwap(alt: typeof allFoods.value[number]) {
+  const g = Number(swapGrams.value)
+  if (!validGrams(g)) { uni.showToast({ title: '克数须大于 0 且不超过 5000', icon: 'none' }); return }
+  if (!detailRecipe.value || !swapping.value) return
+  const source = detailRecipe.value
+  const ingredients = source.ingredients.map((ing, index) => index === swapping.value.index ? { foodId: alt.id, grams: g } : {...ing})
+  const updated: Recipe = calculatedRecipe({ ...source, ingredients }, allFoods.value)
+  const index = customRecipes.value.findIndex(r => r.id === source.id)
+  const next = [...customRecipes.value]
+  if (index >= 0) next[index] = updated
+  else { updated.id = 'custom_' + Date.now(); updated.name = source.name + '（我的搭配）'; next.push(updated) }
+  try { journal.mutate(data => { data.customRecipes = next.map(recipe => calculatedRecipe(recipe, allFoods.value)) }) }
+  catch { uni.showToast({ title: '替换未保存，请重试', icon: 'none' }); return }
+  detailRecipe.value = calculatedRecipe(updated, allFoods.value); swapping.value = null
+  uni.showToast({ title: index >= 0 ? '已保存替换' : '已另存为我的搭配', icon: 'none' })
 }
 </script>
 
 <style scoped>
-.recipe-page { padding: 24rpx 24rpx 48rpx; }
 
-.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16rpx; }
-.section-title { font-size:26rpx; font-weight:600; color:#1a1a1a; }
-.section-add-btn { font-size:24rpx; color:#07c160; font-weight:500; padding:6rpx 16rpx; border:1px solid #07c160; border-radius:20rpx; }
 
-.meal-add-plan {
-  font-size:22rpx; color:#07c160; font-weight:500;
-  padding:6rpx 14rpx; border:1px solid #07c160; border-radius:16rpx;
-  margin-left:12rpx;
-}
 .ing-emoji { font-size:20rpx; }
 
-.builder-name-input {
-  width:100%; height:72rpx; border:1px solid #e0e0e0; border-radius:12rpx;
-  padding:0 16rpx; font-size:28rpx; margin:16rpx 0;
-}
-.builder-chip {
-  display:flex; align-items:center; justify-content:space-between;
-  background:#f8f8f8; padding:10rpx 16rpx; border-radius:8rpx; margin-bottom:6rpx;
-  font-size:24rpx; color:#4d4d4d;
-}
-
-/* 折叠分类 */
-.builder-cat-head { display:flex; align-items:center; gap:8rpx; padding:14rpx 0; }
-.builder-cat-emoji { font-size:26rpx; }
-.builder-cat-label { font-size:24rpx; color:#4d4d4d; font-weight:500; flex:1; }
-.builder-cat-arrow { font-size:20rpx; color:#8c8c8c; }
-.builder-food-grid { display:flex; flex-wrap:wrap; gap:8rpx; margin-bottom:12rpx; }
-.builder-food-chip {
-  width:calc((100% - 24rpx)/4); background:#f8f8f8; border-radius:12rpx;
-  padding:12rpx 4rpx 10rpx; display:flex; flex-direction:column; align-items:center; gap:2rpx;
-}
-.builder-food-chip.selected { background:#e8f5e9; }
-.bfc-emoji { font-size:28rpx; }
-.bfc-name { font-size:20rpx; color:#4d4d4d; font-weight:500; }
-.bfc-kcal { font-size:18rpx; color:#999; }
-
 /* 管理模式 */
-.section-mgr-btn {
-  font-size:24rpx; color:#8c8c8c; font-weight:500;
-  padding:6rpx 16rpx; border:1px solid #ccc; border-radius:20rpx;
-}
 .card-manage { position:relative; }
-.manage-check {
-  position:absolute; top:12rpx; right:12rpx; z-index:5;
-  width:36rpx; height:36rpx; border-radius:50%; border:2rpx solid #ccc;
-  display:flex; align-items:center; justify-content:center; font-size:22rpx; color:#07c160;
-}
-.manage-check.checked { border-color:#07c160; background:#e8f5e9; }
+.manage-check.checked { border-color:#28745b; background:#e8f5e9; }
 .manage-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; padding:16rpx 24rpx; border-top:1px solid #eee; padding-bottom:calc(16rpx + env(safe-area-inset-bottom)); z-index:50; }
-.manage-del-btn { background:#e74c3c; color:#fff; border:none; border-radius:12rpx; font-size:28rpx; height:80rpx; line-height:80rpx; width:100%; }
+.manage-del-btn { background:#ac513b; color:#fff; border:none; border-radius:12rpx; font-size:28rpx; height:80rpx; line-height:80rpx; width:100%; }
 .manage-del-btn::after { border:none; }
-.meal-del-one { font-size:24rpx; color:#ccc; padding:4rpx 8rpx; }
 
-.gap-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,.04);
-}
-.gap-title { font-size: 26rpx; font-weight: 600; color: #1a1a1a; display: block; margin-bottom: 16rpx; }
 .gap-numbers { display: flex; align-items: center; justify-content: space-around; }
 .gap-item { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
 .gap-value { font-size: 32rpx; font-weight: 700; }
-.gap-value.over { color: #e74c3c; }
-.gap-value.ok { color: #07c160; }
-.gap-label { font-size: 20rpx; color: #8c8c8c; }
+.gap-value.over { color: #ac513b; }
+.gap-value.ok { color: #28745b; }
+.gap-label { font-size: 20rpx; color: #68766f; }
 .gap-divider { width: 1px; height: 48rpx; background: #eee; }
 
-.section-title { font-size: 26rpx; font-weight: 600; color: #1a1a1a; display: block; margin-bottom: 16rpx; }
 
 /* 食谱卡片 */
-.meal-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-bottom: 16rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,.04);
-}
 .meal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16rpx; }
 .meal-title-row { display: flex; flex-direction: column; gap: 4rpx; }
-.meal-time-tag { font-size: 22rpx; color: #8c8c8c; }
-.meal-name { font-size: 28rpx; font-weight: 600; color: #1a1a1a; }
-.meal-type-badge { font-size: 20rpx; padding: 4rpx 12rpx; border-radius: 4rpx; font-weight: 500; }
-.meal-type-badge.light { background: #e8f5e9; color: #2e7d32; }
-.meal-type-badge.standard { background: #fbf3e4; color: #8b6914; }
-.meal-type-badge.rich { background: #fde8e8; color: #c0392b; }
-.meal-ingredients { display: flex; flex-wrap: wrap; gap: 8rpx; margin-bottom: 16rpx; }
-.ingredient-chip { display: flex; align-items: center; gap: 6rpx; background: #f8f8f8; padding: 6rpx 12rpx; border-radius: 6rpx; }
+.meal-time-tag { font-size: 22rpx; color: #68766f; }
 .ing-dot { width: 8rpx; height: 8rpx; border-radius: 50%; flex-shrink: 0; }
 .ing-dot.staple { background: #8b6914; }
 .ing-dot.protein { background: #c0392b; }
 .ing-dot.vegetable { background: #2e7d32; }
 .ing-dot.fruit { background: #e67e22; }
 .ing-dot.fat { background: #f9a825; }
-.ing-text { font-size: 22rpx; color: #4d4d4d; }
-.meal-footer { border-top: 1px solid #f0f0f0; padding-top: 14rpx; }
-.meal-kcal { font-size: 26rpx; font-weight: 600; color: #1a1a1a; }
-.meal-desc { font-size: 22rpx; color: #8c8c8c; display: block; margin-top: 4rpx; }
+.meal-kcal { font-size: 26rpx; font-weight: 600; color: #233c33; }
+.meal-desc { font-size: 22rpx; color: #68766f; display: block; margin-top: 4rpx; }
 
 /* 食谱详情弹窗 */
 .detail-overlay {
@@ -550,8 +352,8 @@ function doSwap(alt: any) {
   padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
 }
 .detail-title { font-size: 32rpx; font-weight: 600; display: block; text-align: center; }
-.detail-kcal { font-size: 24rpx; color: #07c160; display: block; text-align: center; margin-top: 4rpx; }
-.detail-sub { font-size: 22rpx; color: #8c8c8c; display: block; text-align: center; margin: 8rpx 0 20rpx; }
+.detail-kcal { font-size: 24rpx; color: #28745b; display: block; text-align: center; margin-top: 4rpx; }
+.detail-sub { font-size: 22rpx; color: #68766f; display: block; text-align: center; margin: 8rpx 0 20rpx; }
 .detail-ingredients { margin-bottom: 24rpx; }
 .detail-ing-row {
   display: flex; align-items: center; gap: 12rpx;
@@ -563,10 +365,10 @@ function doSwap(alt: any) {
 .ing-icon-dot.vegetable { background: #2e7d32; }
 .ing-icon-dot.fruit { background: #e67e22; }
 .ing-icon-dot.fat { background: #f9a825; }
-.ding-name { flex: 1; font-size: 26rpx; color: #1a1a1a; }
+.ding-name { flex: 1; font-size: 26rpx; color: #233c33; }
 .ding-grams { font-size: 24rpx; color: #4d4d4d; }
-.ding-kcal { font-size: 22rpx; color: #8c8c8c; width: 80rpx; text-align: right; }
-.ding-swap-hint { font-size: 22rpx; color: #07c160; }
+.ding-kcal { font-size: 22rpx; color: #68766f; width: 80rpx; text-align: right; }
+.ding-swap-hint { font-size: 22rpx; color: #28745b; }
 
 .detail-close {
   width: 100%; height: 80rpx; line-height: 80rpx;
@@ -577,14 +379,14 @@ function doSwap(alt: any) {
 
 /* 替换弹窗 */
 .swap-title { font-size: 30rpx; font-weight: 600; display: block; text-align: center; }
-.swap-hint { font-size: 22rpx; color: #8c8c8c; display: block; text-align: center; margin: 6rpx 0 20rpx; }
+.swap-hint { font-size: 22rpx; color: #68766f; display: block; text-align: center; margin: 6rpx 0 20rpx; }
 .swap-list { margin-bottom: 24rpx; }
 .swap-item {
   display: flex; justify-content: space-between;
   padding: 20rpx 0; border-bottom: 1px solid #f5f5f5;
 }
-.swap-name { font-size: 26rpx; color: #1a1a1a; font-weight: 500; }
-.swap-kcal { font-size: 22rpx; color: #8c8c8c; }
+.swap-name { font-size: 26rpx; color: #233c33; font-weight: 500; }
+.swap-kcal { font-size: 22rpx; color: #68766f; }
 
 /* 替换弹窗克数调整 */
 .swap-grams-row { display:flex; align-items:center; gap:12rpx; padding:16rpx 0; margin-bottom:8rpx; }
@@ -592,8 +394,44 @@ function doSwap(alt: any) {
 .swap-stepper { display:flex; align-items:center; border:1px solid #e0e0e0; border-radius:10rpx; overflow:hidden; }
 .ss-btn { width:48rpx; height:52rpx; display:flex; align-items:center; justify-content:center; background:#f8f8f8; font-size:28rpx; color:#4d4d4d; }
 .ss-input { width:80rpx; height:52rpx; text-align:center; font-size:26rpx; font-weight:600; }
-.swap-preview { font-size:22rpx; color:#07c160; }
+.swap-preview { font-size:22rpx; color:#28745b; }
 
 .empty-card { background: #fff; border-radius: 16rpx; padding: 48rpx; text-align: center; }
-.empty-text { font-size: 26rpx; color: #8c8c8c; }
+.empty-text { font-size: 26rpx; color: #68766f; }
+
+.gap-label { font-size:max(24rpx,12px); }
+
+.detail-overlay { z-index: 1002; bottom: var(--window-bottom, 0px); }
+.detail-panel, .swap-panel { box-sizing: border-box; max-height: 85vh; overflow-y: auto; padding-bottom: calc(32rpx + env(safe-area-inset-bottom)); }
+.manage-bar { position: static; margin-bottom: 24rpx; border-radius: 20rpx; }
+.recipe-page { max-width:960rpx; margin:0 auto; padding:24rpx 36rpx 48rpx; }
+.meal-card { padding:28rpx 0; margin:0; border-bottom:1px solid var(--line); background:#fff; border-radius:0; box-shadow:none; }
+.gap-card { padding:24rpx; background:var(--wash); border-radius:12rpx; margin-bottom:36rpx; box-shadow:none; }
+.gap-title { font-size:max(24rpx,12px); color:var(--muted); display:block; margin-bottom:16rpx; }
+.section-title { font-size:max(34rpx,17px); font-weight:600; display:block; margin:0; }
+.section-header { display:flex; justify-content:space-between; align-items:center; gap:12rpx; margin-bottom:0; }
+.section-add-btn { font-size:max(26rpx,13px); color:var(--brand); background:var(--wash); padding:0 20rpx; border-radius:10rpx; border:0; margin:0; min-height:44px; line-height:44px; }
+.section-mgr-btn { font-size:max(26rpx,13px); color:var(--brand); padding:0 12rpx; background:transparent; border:0; margin:0; min-height:44px; line-height:44px; }
+.meal-add-plan { font-size:max(26rpx,13px); color:var(--brand); background:#edf4ef; padding:0 22rpx; border-radius:10rpx; border:0; margin:0 0 0 auto; min-height:44px; line-height:44px; }
+.meal-del-one { font-size:max(26rpx,13px); color:#a34831; background:transparent; margin-left:auto; min-height:44px; line-height:44px; }
+.meal-footer { display:flex; align-items:center; gap:16rpx; padding-top:8rpx; border:0; }
+.ingredient-chip { display:inline-flex; background:transparent; padding:0; border-radius:0; }
+.meal-ingredients { display:flex; flex-wrap:wrap; column-gap:20rpx; row-gap:4rpx; margin:12rpx 0; }
+.ing-text { font-size:max(26rpx,13px); color:var(--muted); }
+.meal-name { font-size:max(34rpx,17px); font-weight:600; color:var(--ink); }
+.meal-type-badge { font-size:max(22rpx,11px); color:var(--muted); padding:0; background:transparent; }
+.meal-type-badge.light { color:var(--muted); background:transparent; }
+.meal-type-badge.standard { color:var(--muted); background:transparent; }
+.meal-type-badge.rich { color:var(--muted); background:transparent; }
+.recipe-hint { display:block; color:var(--muted); font-size:max(22rpx,11px); margin-top:6rpx; }
+.manage-check { position:absolute; top:32rpx; right:0; width:40rpx; height:40rpx; border:1px solid #9aaa9f; border-radius:6rpx; display:flex; align-items:center; justify-content:center; }
+.card-manage .meal-header { padding-right:60rpx; }
+.meal-title-row { min-width:0; }.meal-name { overflow-wrap:anywhere; }
+.detail-panel,.swap-panel { max-width:960rpx; overscroll-behavior:contain; }
+.detail-title,.swap-title { font-size:max(34rpx,17px); }
+.detail-sub,.detail-kcal,.swap-hint,.swap-preview,.swap-kcal,.ding-grams,.ding-kcal,.ding-swap-hint { font-size:max(24rpx,12px); }
+.ding-name,.swap-name { font-size:max(26rpx,13px); min-width:0; overflow-wrap:anywhere; }
+.bfc-kcal { font-size:max(22rpx,11px); color:var(--muted); }
+.ss-btn { width:44px; height:44px; }.ss-input { height:44px; }
+.detail-ing-row,.swap-item { min-height:44px; }
 </style>

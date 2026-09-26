@@ -1,29 +1,30 @@
 <template>
   <view class="my-page">
-    <!-- 身体数据 -->
+    <!-- Profile -->
     <view class="form-card">
-      <text class="section-title">身体数据</text>
+      <text class="section-title">身体数据</text><text class="form-note">用于估算目标，目前适用于成年女性</text>
       <view class="input-row">
         <text class="input-label">身高</text>
-        <input class="field-input" type="number" placeholder="厘米" :value="store.profile.height"
-          @input="update('height', Number($event.detail.value))" />
+        <input class="field-input" aria-label="身高，厘米" type="number" placeholder="厘米" :value="store.profile.height"
+          @blur="onProfileBlur('height', $event)" />
         <text class="input-unit">cm</text>
       </view>
       <view class="input-row">
         <text class="input-label">体重</text>
-        <input class="field-input" type="digit" placeholder="公斤" :value="store.profile.weight"
-          @input="update('weight', Number($event.detail.value))" />
+        <input class="field-input" aria-label="体重，公斤" type="digit" placeholder="公斤" :value="store.profile.weight"
+          @blur="onProfileBlur('weight', $event)" />
         <text class="input-unit">kg</text>
       </view>
       <view class="input-row">
         <text class="input-label">年龄</text>
-        <input class="field-input" type="number" placeholder="岁" :value="store.profile.age"
-          @input="update('age', Number($event.detail.value))" />
+        <input class="field-input" aria-label="年龄，岁" type="number" placeholder="岁" :value="store.profile.age"
+          @blur="onProfileBlur('age', $event)" />
         <text class="input-unit">岁</text>
       </view>
     </view>
 
-    <!-- 活动与周期 -->
+    <text v-if="profileError" class="field-error">{{ profileError }}</text><text v-else class="local-note">{{ saved ? '已保存到本机' : '填写后离开输入框会自动保存' }}</text>
+    <!-- Activity -->
     <view class="form-card">
       <text class="section-title">活动与周期</text>
       <view class="picker-row">
@@ -44,42 +45,50 @@
     </view>
 
     <!-- 周期饮食建议 -->
-    <view class="cycle-advice-card">
+    <view v-if="store.profile.cyclePhase" class="cycle-advice-card">
       <text class="advice-title">{{ adviceTitle }}</text>
       <text class="advice-text">{{ cycleAdvice }}</text>
     </view>
 
-    <!-- 每日营养目标 -->
+    <!-- 每日参考目标 -->
     <view v-if="store.nutritionTarget" class="result-card">
-      <text class="section-title">每日营养目标</text>
+      <text class="section-title">每日参考目标</text>
       <view class="target-big">
         <text class="target-number">{{ store.nutritionTarget.targetCalories }}</text>
         <text class="target-unit">千卡/天</text>
       </view>
-      <view class="target-detail">
+      <view v-if="showTargetDetails" class="target-detail">
         <text class="detail-text">BMR {{ store.nutritionTarget.bmr }} · 维持 {{ store.nutritionTarget.maintenance }}</text>
-        <text v-if="store.profile.cyclePhase === 'luteal'" class="cycle-tip">
-          黄体期 +50千卡
-        </text>
+        <text class="cycle-tip">估算参考值 · 周期选择不自动增减热量</text>
       </view>
-      <view class="macro-divider" />
+      <button class="detail-toggle" @tap="showTargetDetails = !showTargetDetails">{{ showTargetDetails ? '收起计算说明' : '查看计算说明' }}</button><view class="macro-divider" />
       <view class="macro-grid">
-        <view class="macro-block"><text class="macro-value">{{ store.nutritionTarget.carbs }}</text><text class="macro-tag">碳水</text><text class="macro-pct">{{ store.nutritionTarget.carbPercent }}%</text></view>
-        <view class="macro-block"><text class="macro-value">{{ store.nutritionTarget.protein }}</text><text class="macro-tag">蛋白质</text><text class="macro-pct">{{ store.nutritionTarget.proteinPercent }}%</text></view>
-        <view class="macro-block"><text class="macro-value">{{ store.nutritionTarget.fat }}</text><text class="macro-tag">脂肪</text><text class="macro-pct">{{ store.nutritionTarget.fatPercent }}%</text></view>
+        <view class="macro-block"><text class="macro-value">{{ store.nutritionTarget.carbs }}<text class="macro-unit"> g</text></text><text class="macro-tag">碳水</text><text class="macro-pct">{{ store.nutritionTarget.carbPercent }}%</text></view>
+        <view class="macro-block"><text class="macro-value">{{ store.nutritionTarget.protein }}<text class="macro-unit"> g</text></text><text class="macro-tag">蛋白质</text><text class="macro-pct">{{ store.nutritionTarget.proteinPercent }}%</text></view>
+        <view class="macro-block"><text class="macro-value">{{ store.nutritionTarget.fat }}<text class="macro-unit"> g</text></text><text class="macro-tag">脂肪</text><text class="macro-pct">{{ store.nutritionTarget.fatPercent }}%</text></view>
       </view>
     </view>
     <view v-else class="empty-card">
       <text class="empty-text">填写身高、体重、年龄后自动计算</text>
     </view>
+    <text v-if="showTargetDetails" class="local-note">使用女性成人公式估算，非医疗处方。营养素按 48% / 28% / 24% 分配，克数取整可能产生小幅差额。调整资料只更新今天，历史目标保留。</text>
+    <DataBackup />
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import DataBackup from '@/components/DataBackup.vue'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
+import { validProfileNumber } from '@/utils/input'
+const profileError = ref('')
+const saved = ref(false)
+const showTargetDetails = ref(false)
 import { useUserStore } from '@/store/user'
 
 const store = useUserStore()
+onShow(() => store.loadFromStorage())
+onPullDownRefresh(() => { store.loadFromStorage(); uni.stopPullDownRefresh() })
 
 const activityOptions = ['几乎不动', '偶尔散步', '日常走动', '经常运动']
 const activityValues = [1.2, 1.3, 1.4, 1.5]
@@ -95,71 +104,57 @@ const cycleIndex = computed(() => {
   return idx >= 0 ? idx : 0
 })
 
-const adviceTitle = ref('💡 生理期饮食建议')
-const cycleAdvice = ref('选择你的生理周期，获取基于科学原理的个性化饮食建议。如：经期宜补铁、黄体期宜摄入健康脂肪。')
+const adviceTitle = ref('生理期饮食建议')
+const cycleAdvice = ref('周期可选填，用于一般饮食提示。个体差异较大，不据此固定增加热量或改变营养素比例。')
 
 const phaseLabels: Record<string, string> = { menstrual: '月经期', follicular: '卵泡期', luteal: '黄体期', ovulatory: '排卵期' }
 const phaseTips: Record<string, string> = {
-  menstrual: '经期铁流失较多，建议多吃瘦牛肉、猪瘦肉、菠菜、鸡蛋等富铁食物。避免生冷冰饮，选择温热小米粥、杂粮饭等。',
-  follicular: '卵泡期代谢回升，体力恢复。建议增加优质碳水如燕麦、红薯，搭配鸡胸肉、虾仁等低脂蛋白质。',
-  ovulatory: '排卵期雌激素达峰值，代谢旺盛。建议多吃西兰花、番茄、蓝莓等高纤维蔬果，搭配三文鱼、核桃等抗炎食材。',
-  luteal: '黄体期易食欲增加和水肿，每日+50千卡。优先选牛油果、三文鱼、坚果等健康脂肪，搭配杂粮饭、香蕉等缓释碳水。',
+  menstrual: '经期注意规律进餐，可搭配瘦肉、豆类等含铁食物。食物温度按个人舒适程度选择；若经量过多或明显乏力，建议就医评估。',
+  follicular: '按平时的食欲和活动量安排饮食，主食、蛋白质食物和蔬菜均衡搭配，无需因周期刻意加减餐。',
+  ovulatory: '保持规律饮食和饮水，按个人感受安排活动。周期阶段本身不代表需要更多或更少的热量。',
+  luteal: '部分人会感到更饿或短暂水肿，可按实际饥饿感安排加餐。研究尚不足以给每个人统一规定额外热量，因此不自动增加 50 千卡。',
 }
 
 watch(() => store.profile.cyclePhase, (phase) => {
   if (phase && phaseLabels[phase]) {
-    adviceTitle.value = `💡 ${phaseLabels[phase]}饮食建议`
+    adviceTitle.value = `${phaseLabels[phase]}饮食建议`
     cycleAdvice.value = phaseTips[phase] || ''
   } else {
-    adviceTitle.value = '💡 生理期饮食建议'
-    cycleAdvice.value = '选择你的生理周期，获取基于科学原理的个性化饮食建议。如：经期宜补铁、黄体期宜摄入健康脂肪。'
+    adviceTitle.value = '生理期饮食建议'
+    cycleAdvice.value = '周期可选填，用于一般饮食提示。个体差异较大，不据此固定增加热量或改变营养素比例。'
   }
 }, { immediate: true })
 
-function update(key: string, val: number) {
-  if (isNaN(val)) return
-  store.updateProfile({ [key]: val })
+function onProfileBlur(key: 'height' | 'weight' | 'age', event: Event) {
+  update(key, String((event as unknown as { detail: { value: string } }).detail.value))
+}
+function update(key: 'height' | 'weight' | 'age', raw: string) {
+  const val = raw.trim() === '' ? null : Number(raw)
+  if (val !== null && !validProfileNumber(key, val)) {
+    profileError.value = {height: '身高请输入 100–230 cm', weight: '体重请输入 25–300 kg', age: '年龄请输入 18–100 的整数'}[key]
+    return
+  }
+  try { store.updateProfile({ [key]: val }); profileError.value = ''; saved.value = true }
+  catch { profileError.value = '保存失败，请重试；上次保存的数据仍保留。' }
 }
 function onActivityChange(e: any) {
-  store.updateProfile({ activityLevel: activityValues[e.detail.value] })
+  try { store.updateProfile({ activityLevel: activityValues[e.detail.value] }); saved.value = true; profileError.value = '' }
+  catch { profileError.value = '保存失败，请重试；上次保存的数据仍保留。' }
 }
 function onCycleChange(e: any) {
-  store.updateProfile({ cyclePhase: cycleKeys[e.detail.value] })
+  try { store.updateProfile({ cyclePhase: cycleKeys[e.detail.value] }); saved.value = true; profileError.value = '' }
+  catch { profileError.value = '保存失败，请重试；上次保存的数据仍保留。' }
 }
 
 </script>
 
 <style scoped>
-.my-page { padding: 24rpx; }
-.form-card { background: #fff; border-radius: 16rpx; padding: 24rpx; margin-bottom: 16rpx; box-shadow: 0 2rpx 12rpx rgba(0,0,0,.04); }
-.section-title { font-size: 28rpx; font-weight: 600; color: #1a1a1a; display: block; margin-bottom: 20rpx; }
-.input-row { display: flex; align-items: center; padding: 8rpx 0; }
-.input-row + .input-row { border-top: 1px solid #f5f5f5; }
-.input-label { font-size: 26rpx; color: #4d4d4d; width: 80rpx; }
-.field-input { flex: 1; height: 72rpx; font-size: 28rpx; color: #1a1a1a; text-align: right; }
-.input-unit { font-size: 24rpx; color: #8c8c8c; width: 48rpx; text-align: right; }
-.picker-row { display: flex; align-items: center; justify-content: space-between; padding: 16rpx 0; }
-.picker-row + .picker-row { border-top: 1px solid #f5f5f5; }
-.picker-value { font-size: 26rpx; color: #1a1a1a; display: flex; align-items: center; gap: 4rpx; }
-.picker-value.optional { color: #8c8c8c; }
-.picker-arrow { font-size: 24rpx; color: #ccc; }
-.result-card { background: #fff; border-radius: 16rpx; padding: 24rpx; }
-.target-big { text-align: center; padding: 16rpx 0; }
-.target-number { font-size: 64rpx; font-weight: 700; color: #07c160; }
-.target-unit { font-size: 28rpx; color: #8c8c8c; margin-left: 8rpx; }
-.target-detail { text-align: center; margin-bottom: 16rpx; }
-.detail-text { font-size: 24rpx; color: #8c8c8c; }
-.cycle-tip { display: block; font-size: 22rpx; color: #e67e22; margin-top: 4rpx; }
-.macro-divider { height: 1px; background: #f0f0f0; margin: 16rpx 0; }
-.macro-grid { display: flex; justify-content: space-around; }
-.macro-block { text-align: center; }
-.macro-value { font-size: 36rpx; font-weight: 700; color: #1a1a1a; display: block; }
-.macro-tag { font-size: 22rpx; color: #8c8c8c; display: block; margin-top: 4rpx; }
-.macro-pct { font-size: 20rpx; color: #8c8c8c; margin-top: 2rpx; }
-.cycle-advice-card { background: #FFF3E0; border-radius: 16rpx; padding: 20rpx 24rpx; margin-bottom: 16rpx; border-left: 4rpx solid #E67E22; }
-.advice-title { font-size: 26rpx; font-weight: 600; color: #E67E22; display: block; margin-bottom: 8rpx; }
-.advice-text { font-size: 24rpx; color: #4d4d4d; line-height: 1.6; }
-
-.empty-card { background: #fff; border-radius: 16rpx; padding: 48rpx; text-align: center; }
-.empty-text { font-size: 26rpx; color: #8c8c8c; }
+.my-page { max-width:960rpx; margin:0 auto; padding:28rpx 36rpx 48rpx; }
+.form-card { padding:12rpx 0 24rpx; margin-bottom:20rpx; border-bottom:1px solid var(--line); }.section-title { display:block; font-size:max(34rpx,17px); font-weight:600; margin-bottom:12rpx; }.form-note { display:block; color:var(--muted); font-size:max(24rpx,12px); margin-bottom:20rpx; }
+.input-row,.picker-row { display:flex; align-items:center; gap:12rpx; min-height:100rpx; padding:10rpx 0; }.input-label { font-size:max(28rpx,14px); flex-shrink:0; width:140rpx; }.field-input { flex:1; min-width:0; height:max(84rpx,44px); padding:0 20rpx; background:var(--wash); border-radius:8rpx; text-align:right; font-size:max(30rpx,15px); }.input-unit { width:44rpx; color:var(--muted); font-size:max(24rpx,12px); text-align:right; }
+.picker-row { justify-content:space-between; }.picker-value { display:flex; align-items:center; gap:16rpx; min-height:44px; font-size:max(28rpx,14px); }.picker-arrow,.optional { color:var(--muted); }
+.cycle-advice-card { background:var(--wash); border-radius:10rpx; padding:24rpx; margin-bottom:32rpx; }.advice-title { display:block; font-size:max(28rpx,14px); margin-bottom:12rpx; }.advice-text { color:var(--muted); font-size:max(26rpx,13px); line-height:1.8; }
+.result-card { padding:16rpx 0 28rpx; border-bottom:1px solid var(--line); }.target-big { padding:12rpx 0; }.target-number { font-size:64rpx; font-weight:600; }.target-unit { font-size:max(26rpx,13px); color:var(--muted); margin-left:12rpx; }.target-detail { margin:12rpx 0; }.detail-text,.cycle-tip { display:block; font-size:max(24rpx,12px); color:var(--muted); line-height:1.8; }
+.detail-toggle { margin:0; padding:0; background:transparent; text-align:left; color:var(--brand); font-size:max(24rpx,12px); line-height:44px; }.macro-divider { height:1px; background:var(--line); margin:12rpx 0 24rpx; }.macro-grid { display:flex; }.macro-block { flex:1; }.macro-value { display:block; font-size:32rpx; font-weight:500; }.macro-unit,.macro-tag,.macro-pct { font-size:max(24rpx,12px); color:var(--muted); font-weight:400; }.macro-tag { display:block; margin-top:4rpx; }.macro-pct { margin-top:2rpx; }
+.empty-card { padding:28rpx 0; color:var(--muted); }.local-note { margin:12rpx 0 32rpx; }
 </style>

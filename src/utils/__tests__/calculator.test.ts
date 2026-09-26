@@ -46,12 +46,12 @@ describe('calcMacros', () => {
     expect(r.cycleTip).toBe('')
   })
 
-  it('黄体期 1700kcal → 1750kcal 碳45%脂27%', () => {
+  it('周期不会额外改变热量或分配比例', () => {
     const r = calcMacros(1700, 'luteal')
-    expect(r.cycleAdjustment).toBe(50)
-    expect(r.cycleTip).toContain('黄体期')
-    expect(r.carbs).toBe(Math.round(1750 * 0.45 / 4))
-    expect(r.protein).toBe(Math.round(1750 * 0.28 / 4))
-    expect(r.fat).toBe(Math.round(1750 * 0.27 / 9))
+    expect(r.cycleAdjustment).toBe(0)
+    expect(r.cycleTip).toContain('周期')
+    expect(r.carbs).toBe(Math.round(1700 * 0.48 / 4))
+    expect(r.protein).toBe(Math.round(1700 * 0.28 / 4))
+    expect(r.fat).toBe(Math.round(1700 * 0.24 / 9))
   })
 })

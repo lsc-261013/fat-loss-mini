@@ -1,43 +1,48 @@
 <template>
   <view class="food-picker">
-    <scroll-view scroll-x class="category-tabs" :show-scrollbar="false">
+    <input class="food-search" aria-label="搜索食材" v-model="search" placeholder="搜索食材，如米饭、鸡蛋" confirm-type="search" />
+    <button class="new-food" @tap="creatingFood = true">＋ 添加新食材</button>
+    <view v-show="!search.trim()" class="category-tabs">
       <view
         v-for="cat in categories"
         :key="cat.key"
         class="tab-item"
         :class="{ active: activeCat === cat.key }"
-        @click="activeCat = cat.key"
+        @click="activeCat = cat.key; expanded = false"
       >
         <text class="tab-text">{{ cat.label }}</text>
         <view v-if="activeCat === cat.key" class="tab-indicator" />
       </view>
-    </scroll-view>
+    </view>
 
+    <text v-if="!filteredFoods.length" class="search-empty">{{ search.trim() ? '没找到这个食材，可以点上方「添加新食材」。' : '这个分类还没有食材，可以自己添加。' }}</text>
     <view class="food-grid">
-      <view
-        v-for="food in filteredFoods"
+      <button
+        v-for="food in (expanded || search.trim() ? filteredFoods : filteredFoods.slice(0, 6))"
         :key="food.id"
         class="food-card"
-        :class="'card-' + food.category"
+        :aria-label="'选择' + food.name"
         @tap="openPicker(food)"
         hover-class="card-touch"
       >
-        <text class="food-emoji">{{ getEmoji(food.id) }}</text>
-        <text class="food-name">{{ food.name }}</text>
-      </view>
+        <view class="food-info"><text class="food-name">{{ food.name }}<text v-if="food.customKey" class="custom-badge">自定义</text></text><text class="food-meta">{{ Math.round(food.kcal * 100) / 100 }} 千卡 / 100 g</text><text v-if="incompleteNutrition(food)" class="food-meta">营养数据未完善</text></view><text class="food-add">＋</text>
+      </button>
     </view>
 
+    <button v-if="!search.trim() && filteredFoods.length > 6" class="expand-foods" @tap="expanded = !expanded">{{ expanded ? '收起食材' : '查看全部 ' + filteredFoods.length + ' 种食材' }} {{ expanded ? '⌃' : '⌄' }}</button>
     <view v-if="showGrams" class="grams-overlay" @click="showGrams = false">
       <view class="grams-panel" @click.stop>
         <text class="grams-title">{{ selectedFood?.name }}</text>
-        <text class="grams-subtitle">每100g ≈ {{ selectedFood?.kcal }}千卡</text>
+        <text class="grams-subtitle">每100g ≈ {{ Math.round((selectedFood?.kcal || 0) * 100) / 100 }}千卡</text>
+        <text v-if="selectedFood?.customKey" class="food-meta">下方为分量换算，按实际食用克数记录。</text>
+        <text v-if="selectedFood && incompleteNutrition(selectedFood)" class="food-meta">营养数据未完善，热量照常计入。</text>
 
         <view class="grams-presets">
           <view
             v-for="opt in quickOptions"
             :key="opt.g"
             class="preset-btn"
-            @click="confirmAdd(opt.g)"
+            @click="customGrams = String(opt.g)" :class="{ selected: Number(customGrams) === opt.g }"
           >
             <text class="preset-g">{{ opt.g }}g</text>
             <text class="preset-label">{{ opt.label }}</text>
@@ -55,7 +60,7 @@
             <view class="stepper-btn" @click="adjustGrams(-10)">−</view>
             <view class="stepper-input-wrap">
               <input
-                class="stepper-input"
+                class="stepper-input" aria-label="食物克数"
                 type="number"
                 v-model="customGrams"
                 placeholder="100"
@@ -66,46 +71,43 @@
           <text class="custom-unit">克</text>
         </view>
 
-        <text class="custom-preview" v-if="customKcal > 0">
+        <text class="custom-preview" v-if="validGrams(customGrams)">
           约 {{ customKcal }} 千卡
         </text>
 
+        <text v-if="!validGrams(customGrams)" class="field-error">请输入大于 0、且不超过 5000 的克数</text>
         <view class="grams-actions">
           <button class="btn-cancel" @click="showGrams = false">取消</button>
-          <button class="btn-confirm" @click="confirmAdd(Number(customGrams) || 100)">
-            加入 {{ Number(customGrams) || 100 }}g
+          <button class="btn-confirm" @click="confirmAdd(Number(customGrams))" :disabled="!validGrams(customGrams)">
+            {{ actionLabel }} {{ validGrams(customGrams) ? customGrams + 'g' : '' }}
           </button>
         </view>
       </view>
     </view>
+    <CustomFoodEditor v-if="creatingFood" :initial-name="search.trim()" @close="creatingFood = false" @saved="onFoodSaved" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { validGrams } from '@/utils/input'
+defineProps<{ actionLabel: string }>()
+const search = ref('')
+const expanded = ref(false)
 import type { FoodItem } from '@/store/records'
 import { usePlanStore } from '@/store/plan'
-import foodsData from '@/static/foods.json'
+import { useJournalStore } from '@/store/journal'
+import { foodCategories } from '@/utils/customFoods'
+import { incompleteNutrition } from '@/utils/nutrition'
+import CustomFoodEditor from './CustomFoodEditor.vue'
 
-const foods = foodsData as FoodItem[]
+const journal = useJournalStore()
+const foods = computed(() => journal.allFoods)
+const creatingFood = ref(false)
 const planStore = usePlanStore()
 
-const emojiMap: Record<number, string> = {
-  1:'🍚',2:'🍚',3:'🥟',4:'🍜',5:'🍞',6:'🍠',7:'🌽',8:'🥣',9:'🥣',10:'🍜',
-  11:'🍗',12:'🥩',13:'🥚',14:'🦐',15:'🥩',16:'🧈',17:'🫘',18:'🐟',19:'🐟',
-  21:'🥦',22:'🥬',23:'🥬',24:'🍅',25:'🥒',26:'🥔',27:'🫘',28:'🍆',29:'🫑',30:'🥕',
-  31:'🍈',32:'🥬',33:'🍌',34:'🍎',35:'🍉',36:'🍑',37:'🫐',38:'🍐',39:'🍊',
-  41:'🫒',42:'🫒',43:'🥑',44:'🥜',45:'🥜',46:'🫒',47:'🎃',
-}
-function getEmoji(id: number) { return emojiMap[id] || '🍽️' }
 
-const categories = [
-  { key: 'staple', label: '主食' },
-  { key: 'protein', label: '蛋白质' },
-  { key: 'vegetable', label: '蔬菜' },
-  { key: 'fruit', label: '水果' },
-  { key: 'fat', label: '油脂' },
-]
+const categories = foodCategories
 
 const activeCat = ref('staple')
 const showGrams = ref(false)
@@ -113,7 +115,7 @@ const selectedFood = ref<FoodItem | null>(null)
 const customGrams = ref('')
 
 const filteredFoods = computed(() =>
-  foods.filter((f) => f.category === activeCat.value)
+  foods.value.filter((f) => search.value.trim() ? f.name.toLowerCase().includes(search.value.trim().toLowerCase()) : f.category === activeCat.value)
 )
 
 // 基于实际食物分量（查询中国食物成分表 + 日常经验）
@@ -173,6 +175,10 @@ const portionHints: Record<number, { g: number; label: string }[]> = {
 const quickOptions = computed(() => {
   const food = selectedFood.value
   if (!food) return []
+  if (food.customKey) {
+    const grams = food.portionGrams || 100
+    return [{ g: grams / 2, label: '参考分量×½' }, { g: grams, label: '填写的分量' }, { g: grams * 2, label: '参考分量×2' }, { g: 100, label: '100克' }].filter((option, index, options) => validGrams(option.g) && options.findIndex(other => other.g === option.g) === index)
+  }
   return portionHints[food.id] || [
     { g: 50, label: '少量' },
     { g: 100, label: '一份' },
@@ -195,8 +201,13 @@ function openPicker(food: FoodItem) {
   selectedFood.value = food
   // 使用记忆的常用克数，没有则默认100
   const remembered = planStore.getRememberedGrams(food.id)
-  customGrams.value = String(remembered || 100)
+  customGrams.value = String(remembered || food.portionGrams || 100)
   showGrams.value = true
+}
+
+function onFoodSaved(food: FoodItem) {
+  creatingFood.value = false; search.value = ''; activeCat.value = food.category; expanded.value = true
+  openPicker(food)
 }
 
 function adjustGrams(delta: number) {
@@ -206,6 +217,7 @@ function adjustGrams(delta: number) {
 }
 
 function confirmAdd(g: number) {
+  if (!validGrams(g)) return
   if (selectedFood.value) {
     planStore.rememberGrams(selectedFood.value.id, g)
     emit('add', selectedFood.value, g)
@@ -215,273 +227,17 @@ function confirmAdd(g: number) {
 </script>
 
 <style scoped>
-.food-picker {
-  margin-bottom: 16rpx;
-}
-
-.category-tabs {
-  white-space: nowrap;
-  margin-bottom: 16rpx;
-  height: 56rpx;
-}
-
-.tab-item {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0 24rpx;
-  height: 56rpx;
-  position: relative;
-}
-
-.tab-text {
-  font-size: 26rpx;
-  color: #8c8c8c;
-}
-
-.tab-item.active .tab-text {
-  color: #1a1a1a;
-  font-weight: 600;
-}
-
-.tab-indicator {
-  width: 24rpx;
-  height: 4rpx;
-  border-radius: 2rpx;
-  background: #07c160;
-  margin-top: 6rpx;
-}
-
-.food-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0;
-  row-gap: 12rpx;
-}
-
-.food-card {
-  width: calc((100% - 24rpx) / 4);
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 14rpx 4rpx 12rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 200ms ease-out;
-}
-
-.card-touch {
-  transform: translateY(-4rpx);
-  box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.1);
-}
-
-.food-emoji {
-  font-size: 40rpx;
-  line-height: 1.2;
-}
-
-.food-name {
-  font-size: 22rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-  text-align: center;
-  line-height: 1.3;
-}
-
-.food-meta {
-  font-size: 18rpx;
-  color: #999;
-}
-
-/* 克数弹窗 */
-.grams-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 100;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.grams-panel {
-  background: #fff;
-  border-radius: 24rpx 24rpx 0 0;
-  padding: 32rpx 24rpx 32rpx;
-  width: 100%;
-  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
-}
-
-.grams-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-  display: block;
-  text-align: center;
-}
-
-.grams-subtitle {
-  font-size: 24rpx;
-  color: #8c8c8c;
-  display: block;
-  text-align: center;
-  margin-top: 6rpx;
-  margin-bottom: 24rpx;
-}
-
-.grams-presets {
-  display: flex;
-  gap: 12rpx;
-  margin-bottom: 24rpx;
-}
-
-.preset-btn {
-  flex: 1;
-  text-align: center;
-  padding: 14rpx 0;
-  border-radius: 12rpx;
-  background: #f8f8f8;
-  display: flex;
-  flex-direction: column;
-  gap: 2rpx;
-}
-
-.preset-btn:active {
-  background: #e8f5e9;
-}
-
-.preset-g {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.preset-label {
-  font-size: 20rpx;
-  color: #8c8c8c;
-}
-
-/* 分割线 */
-.grams-divider {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-bottom: 20rpx;
-}
-
-.divider-line {
-  flex: 1;
-  height: 1px;
-  background: #e8e8e8;
-}
-
-.divider-text {
-  font-size: 22rpx;
-  color: #b0b0b0;
-}
-
-/* 自定义输入 */
-.grams-custom {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12rpx;
-  margin-bottom: 12rpx;
-}
-
-.custom-stepper {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border: 1px solid #e0e0e0;
-  border-radius: 12rpx;
-  overflow: hidden;
-}
-
-.stepper-btn {
-  width: 64rpx;
-  height: 72rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 36rpx;
-  color: #4d4d4d;
-  background: #f8f8f8;
-}
-
-.stepper-btn:active {
-  background: #e8e8e8;
-}
-
-.stepper-input-wrap {
-  width: 120rpx;
-  height: 72rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-}
-
-.stepper-input {
-  width: 100%;
-  height: 100%;
-  text-align: center;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.custom-unit {
-  font-size: 26rpx;
-  color: #4d4d4d;
-}
-
-.custom-preview {
-  display: block;
-  text-align: center;
-  font-size: 24rpx;
-  color: #07c160;
-  margin-bottom: 20rpx;
-}
-
-.grams-actions {
-  display: flex;
-  gap: 12rpx;
-}
-
-.btn-cancel {
-  flex: 1;
-  height: 80rpx;
-  line-height: 80rpx;
-  text-align: center;
-  background: #f5f5f5;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #8c8c8c;
-  border: none;
-}
-
-.btn-cancel::after { border: none; }
-.btn-confirm::after { border: none; }
-
-.btn-confirm {
-  flex: 2;
-  height: 80rpx;
-  line-height: 80rpx;
-  text-align: center;
-  background: #07c160;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #fff;
-  font-weight: 600;
-  border: none;
-}
+.food-search { background:var(--wash); border-radius:10rpx; height:max(88rpx,44px); padding:0 24rpx; font-size:max(28rpx,14px); margin-bottom:12rpx; }
+.new-food { color:var(--brand); background:transparent; text-align:left; margin:0 0 8rpx; padding:0 4rpx; line-height:44px; font-size:max(26rpx,13px); }.custom-badge { margin-left:12rpx; font-size:12px; color:var(--muted); font-weight:400; }
+.category-tabs { overflow-x:auto; white-space:nowrap; margin-bottom:8rpx; }
+.tab-item { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; padding:0 22rpx; height:max(88rpx,44px); position:relative; }.tab-text { font-size:max(26rpx,13px); color:var(--muted); }.tab-item.active .tab-text { color:var(--brand); font-weight:600; }.tab-indicator { width:24rpx; height:4rpx; background:var(--brand); position:absolute; bottom:6rpx; }
+.food-card { display:flex; width:100%; align-items:center; justify-content:space-between; text-align:left; padding:20rpx 4rpx; margin:0; line-height:1.6; background:transparent; border-radius:0; border-bottom:1px solid var(--line); }.food-info { flex:1; min-width:0; }.food-name { display:block; font-size:max(30rpx,15px); font-weight:500; color:var(--ink); }.food-meta { display:block; font-size:max(24rpx,12px); color:var(--muted); }.food-add { font-size:36rpx; color:var(--brand); padding:0 12rpx; }.card-touch { background:var(--wash); }
+.search-empty { display:block; padding:32rpx 0; color:var(--muted); }.expand-foods { color:var(--brand); background:transparent; font-size:max(26rpx,13px); line-height:44px; margin:8rpx 0; }
+.grams-overlay { position:fixed; top:0; left:0; right:0; bottom:var(--window-bottom,0px); z-index:1001; background:rgba(0,0,0,.35); display:flex; align-items:flex-end; justify-content:center; }
+.grams-panel { background:#fff; width:100%; max-width:960rpx; max-height:85vh; overflow-y:auto; border-radius:24rpx 24rpx 0 0; padding:36rpx; padding-bottom:calc(32rpx + env(safe-area-inset-bottom)); }
+.grams-title { display:block; font-size:max(36rpx,18px); font-weight:600; }.grams-subtitle { display:block; color:var(--muted); font-size:max(26rpx,13px); margin:8rpx 0 28rpx; }
+.grams-presets { display:flex; gap:12rpx; margin-bottom:28rpx; }.preset-btn { flex:1; text-align:center; padding:16rpx 0; border:1px solid var(--line); border-radius:10rpx; }.preset-btn.selected { border-color:var(--brand); background:#edf4ef; }.preset-g,.preset-label { display:block; }.preset-g { font-size:max(28rpx,14px); }.preset-label { font-size:max(22rpx,11px); color:var(--muted); }
+.grams-divider { margin-bottom:18rpx; }.divider-text { color:var(--muted); font-size:max(24rpx,12px); }.divider-line { display:none; }
+.grams-custom { display:flex; align-items:center; gap:16rpx; }.custom-stepper { display:flex; border:1px solid var(--line); border-radius:10rpx; overflow:hidden; }.stepper-btn { width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--wash); font-size:32rpx; }.stepper-input-wrap { width:150rpx; }.stepper-input { height:44px; width:100%; text-align:center; font-size:32rpx; }.custom-unit { color:var(--muted); }.custom-preview { display:block; font-size:max(28rpx,14px); margin:20rpx 0; }
+.grams-actions { display:flex; gap:16rpx; margin-top:24rpx; }.btn-cancel,.btn-confirm { line-height:44px; min-height:44px; font-size:max(28rpx,14px); border-radius:10rpx; }.btn-cancel { flex:1; background:var(--wash); color:var(--ink); }.btn-confirm { flex:2; background:var(--brand); color:#fff; }
 </style>

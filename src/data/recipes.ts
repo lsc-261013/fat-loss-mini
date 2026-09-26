@@ -1,3 +1,4 @@
+import { calculatedRecipe } from '@/utils/nutrition'
 export interface Recipe {
   id: string
   name: string
@@ -5,13 +6,13 @@ export interface Recipe {
   mealTime: 'breakfast' | 'lunch' | 'dinner' | 'snack'
   ingredients: { foodId: number; grams: number }[]
   totalKcal: number
-  totalCarbs: number
-  totalProtein: number
-  totalFat: number
+  totalCarbs: number | null
+  totalProtein: number | null
+  totalFat: number | null
   description: string
 }
 
-export const recipes: Recipe[] = [
+const presetRecipes: Recipe[] = [
   {
     id: 'r1',
     name: '早餐：燕麦鸡蛋餐',
@@ -26,7 +27,7 @@ export const recipes: Recipe[] = [
     totalCarbs: 48,
     totalProtein: 20,
     totalFat: 14,
-    description: '≈384大卡，高纤维饱腹早餐',
+    description: '高纤维饱腹早餐',
   },
   {
     id: 'r2',
@@ -42,7 +43,7 @@ export const recipes: Recipe[] = [
     totalCarbs: 52,
     totalProtein: 54,
     totalFat: 5,
-    description: '≈478大卡，高蛋白午餐，补充蛋白质缺口',
+    description: '高蛋白午餐，补充蛋白质缺口',
   },
   {
     id: 'r3',
@@ -59,7 +60,7 @@ export const recipes: Recipe[] = [
     totalCarbs: 8,
     totalProtein: 25,
     totalFat: 26,
-    description: '≈352大卡，低碳水高蛋白午餐',
+    description: '低碳水高蛋白午餐',
   },
   {
     id: 'r4',
@@ -75,7 +76,7 @@ export const recipes: Recipe[] = [
     totalCarbs: 14,
     totalProtein: 36,
     totalFat: 10,
-    description: '≈283大卡，低卡高蛋白晚餐',
+    description: '低卡高蛋白晚餐',
   },
   {
     id: 'r5',
@@ -92,11 +93,11 @@ export const recipes: Recipe[] = [
     totalCarbs: 25,
     totalProtein: 35,
     totalFat: 19,
-    description: '≈398大卡，丰盛晚餐，适合缺口较大时选择',
+    description: '丰盛晚餐，适合缺口较大时选择',
   },
   {
     id: 'r6',
-    name: '加餐：坚果酸奶杯',
+    name: '加餐：坚果蓝莓杯',
     type: 'light',
     mealTime: 'snack',
     ingredients: [
@@ -107,7 +108,7 @@ export const recipes: Recipe[] = [
     totalCarbs: 14,
     totalProtein: 4,
     totalFat: 11,
-    description: '≈167大卡，健康脂肪加餐',
+    description: '健康脂肪加餐',
   },
   {
     id: 'r7',
@@ -124,6 +125,8 @@ export const recipes: Recipe[] = [
     totalCarbs: 54,
     totalProtein: 38,
     totalFat: 11,
-    description: '≈460大卡，河南家常风味，蛋白质和膳食纤维均衡',
+    description: '河南家常风味，蛋白质和膳食纤维均衡',
   },
 ]
+
+export const recipes = presetRecipes.map(recipe => calculatedRecipe(recipe))

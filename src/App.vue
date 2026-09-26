@@ -16,10 +16,5 @@ onLaunch(() => {
 </script>
 
 <style>
-page {
-  background-color: #F6F6F6;
-  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 26rpx;
-  color: #1A1A1A;
-}
+@import "./styles/theme.css";
 </style>

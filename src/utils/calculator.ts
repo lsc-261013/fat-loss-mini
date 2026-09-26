@@ -1,3 +1,5 @@
+import type { UserProfile, NutritionTarget } from '@/types/journal'
+import { validProfileNumber } from './input'
 /**
  * Mifflin-St Jeor 公式 (女性)
  * BMR = 10 × 体重(kg) + 6.25 × 身高(cm) - 5 × 年龄 - 161
@@ -28,36 +30,20 @@ export interface MacroResult {
   cycleTip: string
 }
 
-/**
- * 三大宏量营养素分配
- * 默认：碳水48% 蛋白质28% 脂肪24%
- * 黄体期：碳水45% 蛋白质28% 脂肪27%，总热量 +50kcal
- */
+// Phase selection is informational; evidence does not support a universal calorie increment.
 export function calcMacros(targetCalories: number, cyclePhase: string | null): MacroResult {
-  let carbPct = 0.48
-  let proteinPct = 0.28
-  let fatPct = 0.24
-  let cycleAdjustment = 0
-  let cycleTip = ''
-
-  if (cyclePhase === 'luteal') {
-    carbPct = 0.45
-    proteinPct = 0.28
-    fatPct = 0.27
-    cycleAdjustment = 50
-    cycleTip = '黄体期可适当增加健康脂肪摄入'
-  }
-
-  const adjustedCalories = targetCalories + cycleAdjustment
-
   return {
-    carbs: Math.round((adjustedCalories * carbPct) / 4),
-    protein: Math.round((adjustedCalories * proteinPct) / 4),
-    fat: Math.round((adjustedCalories * fatPct) / 9),
-    carbPercent: Math.round(carbPct * 100),
-    proteinPercent: Math.round(proteinPct * 100),
-    fatPercent: Math.round(fatPct * 100),
-    cycleAdjustment,
-    cycleTip,
+    carbs: Math.round(targetCalories * .48 / 4), protein: Math.round(targetCalories * .28 / 4), fat: Math.round(targetCalories * .24 / 9),
+    carbPercent: 48, proteinPercent: 28, fatPercent: 24, cycleAdjustment: 0,
+    cycleTip: cyclePhase ? '周期不自动改变热量目标，可结合食欲和身体感受调整饮食。' : '',
   }
+}
+export function profileTarget(profile: UserProfile): NutritionTarget | null {
+  const { weight, height, age, activityLevel, cyclePhase } = profile
+  if (weight === null || height === null || age === null || !validProfileNumber('weight', weight) || !validProfileNumber('height', height) || !validProfileNumber('age', age)) return null
+  const bmr = calcBMR(weight, height, age)
+  const maintenance = calcMaintenance(bmr, activityLevel)
+  const targetCalories = calcTargetCalories(maintenance, weight)
+  if (targetCalories <= 0) return null
+  return { bmr, maintenance, targetCalories, deficit: maintenance - targetCalories, ...calcMacros(targetCalories, cyclePhase) }
 }
