@@ -1,23 +1,31 @@
 <template>
   <view class="home-page">
-    <view class="home-heading"><text class="today-title">今天</text><text class="today-date">{{ recordsStore.todayStr }}</text></view>
-    <CalorieCard v-if="userStore.nutritionTarget" :target="userStore.nutritionTarget.targetCalories" :consumed="recordsStore.todayTotal.kcal" :macros="macroPayload" />
-    <view v-else class="empty-card"><text class="empty-title">今天已记录 {{ intakeKcal }} 千卡</text><text class="empty-desc">填写身体数据后可查看参考目标。</text><button class="secondary-action" @tap="navigate('/pages/my/index')">设置参考目标</button></view>
-    <button class="primary-action" @tap="openToday">记录饮食</button>
-    <view class="rec-section" v-if="userStore.nutritionTarget && recommendations.length">
-      <text class="section-title">搭配参考</text><text class="section-note">按今天的营养差额筛选</text>
-      <view v-for="rec in recommendations" :key="rec.food.id" class="rec-row"><view class="rec-info"><text class="rec-name">{{ rec.food.name }}</text><text class="rec-reason">{{ rec.reason }}</text></view><text class="rec-kcal">{{ rec.food.kcal }} 千卡 / 100 g</text></view>
-      <text class="section-note end-note">仅作食材参考，分量按实际需要安排。</text>
-    </view>
-    <view v-else-if="userStore.nutritionTarget" class="rec-section"><text class="section-title">搭配参考</text><text class="section-note">{{ incompleteNutrition(recordsStore.todayTotal) ? '部分食材营养数据未完善，暂不按营养差额推荐。' : '今天暂无进一步建议，按饥饿感和实际需要安排饮食。' }}</text></view>
+    <view class="home-heading"><view><text class="page-eyebrow">一餐一餐，慢慢记</text><text class="today-title">今天的饮食</text></view><view class="date-pill"><AppIcon name="calendar" :size="16"/><text>{{ recordsStore.todayStr.slice(5).replace('-', ' / ') }}</text></view></view>
+    <CalorieCard :target="userStore.nutritionTarget?.targetCalories" :consumed="recordsStore.todayTotal.kcal" :macros="macroPayload" />
+    <view class="quick-actions"><button class="primary-action" @tap="openToday"><text class="button-plus">＋</text>记录饮食</button><button v-if="!userStore.nutritionTarget" class="profile-link" @tap="navigate('/pages/my/index')">设置参考目标</button></view>
+    <view class="section-heading"><view><text class="section-title">{{ pendingPlanCount ? '待吃的这一餐' : '下一餐，吃点什么' }}</text><text class="section-note">{{ pendingPlanCount ? '计划先安排，吃过再确认' : '看看日常搭配，也可以直接记录' }}</text></view><button v-if="pendingPlanCount" class="text-link" @tap="journalNavigation.openToday('plan')">全部 {{ pendingPlanCount }} 项 ›</button></view>
+    <view v-if="nextPlan" class="next-meal surface-panel" @tap="journalNavigation.openToday('plan')"><view class="meal-image"><FoodVisual :src="planImage(nextPlan)" :category="nextPlan.recipe ? 'dish' : nextPlan.items[0].category" :label="nextPlan.name" /></view><view class="meal-copy"><text class="pending-tag">{{ nextPlan.state === 'partial' ? '部分已吃' : '待吃' }}</text><text class="meal-name">{{ displayDishName(nextPlan.name) }}</text><text class="meal-meta">计划 {{ Math.round(nextPlan.kcal) }} 千卡</text><text class="meal-meta">{{ nextPlan.items.map(item => item.foodName).join(' · ') }}</text><button class="meal-next" @tap.stop="journalNavigation.openToday('plan')">查看计划 <AppIcon name="arrow" :size="17" /></button></view></view>
+    <view v-else class="choose-meal surface-panel"><view class="choose-image"><FoodVisual src="/static/food/r2.jpg" label="鸡胸肉杂粮饭" /></view><view class="choose-copy"><text class="meal-name">从一道搭配开始</text><text class="meal-meta">选好这一餐，再按实际分量记下。</text><button class="meal-next" @tap="navigate('/pages/recipe/index')">挑选食谱 <AppIcon name="arrow" :size="17" /></button></view></view>
+    <view class="rec-section" v-if="userStore.nutritionTarget && recommendations.length"><view class="section-heading"><text class="section-title">搭配参考</text><AppIcon name="leaf" /></view><text class="section-note">按今天的营养差额筛选</text><view class="recommendations"><view v-for="rec in recommendations" :key="rec.food.id" class="rec-row"><view class="rec-icon"><FoodVisual :category="rec.food.category" /></view><view class="rec-info"><text class="rec-name">{{ rec.food.name }}</text><text class="rec-reason">{{ rec.reason }} · {{ rec.food.kcal }} 千卡 / 100 g</text></view></view></view><text class="section-note end-note">分量按实际需要安排。</text></view>
+    <view v-else-if="userStore.nutritionTarget" class="rec-section"><text class="section-title">搭配参考</text><text class="section-note">{{ incompleteNutrition(recordsStore.todayTotal) ? '部分营养数据未完善，暂不按营养差额推荐。' : '暂无进一步建议，按饥饿感和实际需要安排饮食。' }}</text></view>
     <view class="start-date"><text>开始记录后的第 {{ userStore.streakDays }} 天</text><picker mode="date" :value="userStore.startDate" start="1900-01-01" :end="journal.today" @change="onStartDatePick"><view class="start-date-action" role="button" aria-label="调整起始日">调整起始日</view></picker></view>
+    <text class="image-note">食物图片为示意，热量按食材与分量计算。</text>
   </view>
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
+import FoodVisual from '@/components/FoodVisual.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import { planImage, displayDishName } from '@/utils/foodVisuals'
 import CalorieCard from '@/components/CalorieCard.vue'
 import { useJournalStore } from '@/store/journal'
+import { useJournalNavigation } from '@/store/journalNavigation'
+import { groupPlans } from '@/utils/planGroups'
 const journal = useJournalStore()
+const journalNavigation = useJournalNavigation()
+const pendingPlans = computed(() => groupPlans(journal.todayDay.plans, journal.todayDay.entries).filter(group => group.pendingIds.length))
+const pendingPlanCount = computed(() => pendingPlans.value.length)
+const nextPlan = computed(() => pendingPlans.value[0])
 const navigate = (url: string) => uni.switchTab({ url })
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
@@ -41,9 +49,9 @@ const remainingKcal = computed(() => (userStore.nutritionTarget?.targetCalories 
 
 const macroPayload = computed(() => {
   const t = userStore.nutritionTarget, n = recordsStore.todayTotal
-  return t ? { carbs: { target:t.carbs, consumed:n.carbs }, protein:{target:t.protein,consumed:n.protein}, fat:{target:t.fat,consumed:n.fat} } : undefined
+  return { carbs: { target:t?.carbs, consumed:n.carbs }, protein:{target:t?.protein,consumed:n.protein}, fat:{target:t?.fat,consumed:n.fat} }
 })
-function openToday() { journal.selectDate(journal.today); navigate('/pages/record/index') }
+function openToday() { journalNavigation.openToday('record') }
 // 营养素缺口推荐
 const recommendations = computed(() => {
   if (!userStore.nutritionTarget || incompleteNutrition(recordsStore.todayTotal)) return []
@@ -85,10 +93,15 @@ const recommendations = computed(() => {
 })
 </script>
 <style scoped>
-.home-page { max-width:960rpx; margin:0 auto; padding:36rpx; padding-bottom:calc(32rpx + env(safe-area-inset-bottom)); }
-.home-heading { display:flex; align-items:baseline; gap:20rpx; margin-bottom:12rpx; }.today-title { font-size:40rpx; font-weight:600; }.today-date { color:var(--muted); font-size:max(26rpx,13px); }
-.primary-action { margin:0 0 48rpx; }.empty-card { padding:24rpx 0 36rpx; }.empty-title { display:block; font-size:36rpx; }.empty-desc { display:block; color:var(--muted); margin-top:16rpx; }
-.section-title { display:block; font-size:max(34rpx,17px); font-weight:600; }.section-note { display:block; font-size:max(24rpx,12px); color:var(--muted); margin:10rpx 0 20rpx; }
-.rec-row { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); padding:22rpx 0; gap:20rpx; }.rec-info { flex:1; min-width:0; }.rec-name { font-size:max(30rpx,15px); display:block; }.rec-reason { font-size:max(24rpx,12px); color:var(--muted); }.rec-kcal { font-size:max(24rpx,12px); color:var(--muted); }.end-note { margin-top:24rpx; }
-.start-date { width:100%; padding:16rpx 0; margin-top:48rpx; display:flex; align-items:center; justify-content:space-between; gap:12rpx; border-top:1px solid var(--line); font-size:max(24rpx,12px); color:var(--muted); line-height:1.8; }.start-date-action { color:var(--brand); min-height:44px; display:flex; align-items:center; white-space:nowrap; }
+
+.home-page { max-width:620px; margin:0 auto; padding:24px 20px 28px; padding-bottom:calc(28px + env(safe-area-inset-bottom)); }
+.home-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }.page-eyebrow { display:block; color:var(--muted); font-size:12px; margin-bottom:4px; }.today-title { font-size:26px; font-weight:650; letter-spacing:-.5px; }.date-pill { display:flex; gap:7px; align-items:center; color:var(--brand); background:#edf0e7; padding:7px 11px; border-radius:24px; font-size:12px; }
+.quick-actions { display:flex; align-items:center; gap:14px; margin:16px 0 28px; }.primary-action { flex:1; margin:0; display:flex; gap:8px; align-items:center; justify-content:center; }.button-plus { font-size:23px; font-weight:400; }.profile-link { background:transparent; margin:0; padding:0 4px; font-size:12px; color:var(--brand); }
+.section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }.section-title { display:block; font-size:19px; font-weight:650; }.section-note { display:block; color:var(--muted); font-size:12px; margin-top:4px; }.text-link { background:transparent; margin:0; padding:0; font-size:12px; color:var(--brand); white-space:nowrap; }
+.next-meal { display:flex; padding:12px; gap:16px; }.meal-image { width:38%; min-height:155px; flex-shrink:0; border-radius:14px; overflow:hidden; }.meal-copy { flex:1; min-width:0; padding:2px 0; }.pending-tag { display:inline-block; color:#856138; background:#f6edde; font-size:10px; border-radius:5px; padding:2px 6px; margin-bottom:6px; }.meal-name { display:block; font-size:17px; font-weight:600; overflow-wrap:anywhere; line-height:1.5; }.meal-meta { display:block; font-size:12px; color:var(--muted); margin-top:5px; }.meal-next { display:flex; align-items:center; gap:8px; background:transparent; color:var(--brand); font-size:13px; margin:5px 0 0; padding:0; text-align:left; }
+.choose-meal { overflow:hidden; }.choose-image { height:155px; }.choose-copy { padding:16px 18px 12px; }.choose-copy .meal-next { min-height:40px; }
+.rec-section { margin-top:28px; }.recommendations { margin-top:12px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }.rec-row { display:flex; align-items:center; gap:10px; }.rec-icon { width:44px; height:44px; border-radius:12px; overflow:hidden; flex-shrink:0; }.rec-info { min-width:0; }.rec-name { display:block; font-size:14px; }.rec-reason { display:block; font-size:11px; color:var(--muted); }.end-note { margin-top:14px; }
+.start-date { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:26px; padding-top:12px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); }.start-date-action { display:flex; align-items:center; min-height:44px; color:var(--brand); }.image-note { display:block; color:var(--muted); font-size:11px; margin-top:8px; }
+@media(max-width:350px) { .home-page { padding:20px 16px 28px; }.today-title { font-size:24px; }.quick-actions { gap:8px; }.next-meal { gap:12px; }.meal-name { font-size:15px; } }
+
 </style>

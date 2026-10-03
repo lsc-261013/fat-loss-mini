@@ -1,7 +1,7 @@
 <template>
   <view class="food-picker">
     <input class="food-search" aria-label="搜索食材" v-model="search" placeholder="搜索食材，如米饭、鸡蛋" confirm-type="search" />
-    <button class="new-food" @tap="creatingFood = true">＋ 添加新食材</button>
+    <button class="new-food" @tap="creatingFood = true"><AppIcon name="plus" :size="17"/> 添加新食材</button>
     <view v-show="!search.trim()" class="category-tabs">
       <view
         v-for="cat in categories"
@@ -25,14 +25,14 @@
         @tap="openPicker(food)"
         hover-class="card-touch"
       >
-        <view class="food-info"><text class="food-name">{{ food.name }}<text v-if="food.customKey" class="custom-badge">自定义</text></text><text class="food-meta">{{ Math.round(food.kcal * 100) / 100 }} 千卡 / 100 g</text><text v-if="incompleteNutrition(food)" class="food-meta">营养数据未完善</text></view><text class="food-add">＋</text>
+        <view class="food-thumb"><FoodVisual :category="food.category" :label="food.name"/></view><view class="food-info"><text class="food-name">{{ food.name }}<text v-if="food.customKey" class="custom-badge">自定义</text></text><text class="food-meta">{{ Math.round(food.kcal * 100) / 100 }} 千卡 / 100 g</text><text v-if="incompleteNutrition(food)" class="food-meta">营养数据未完善</text></view><AppIcon name="plus" :size="18"/>
       </button>
     </view>
 
     <button v-if="!search.trim() && filteredFoods.length > 6" class="expand-foods" @tap="expanded = !expanded">{{ expanded ? '收起食材' : '查看全部 ' + filteredFoods.length + ' 种食材' }} {{ expanded ? '⌃' : '⌄' }}</button>
     <view v-if="showGrams" class="grams-overlay" @click="showGrams = false">
       <view class="grams-panel" @click.stop>
-        <text class="grams-title">{{ selectedFood?.name }}</text>
+        <view class="grams-heading"><view class="grams-thumb"><FoodVisual :category="selectedFood?.category" :label="selectedFood?.name"/></view><text class="grams-title">{{ selectedFood?.name }}</text></view>
         <text class="grams-subtitle">每100g ≈ {{ Math.round((selectedFood?.kcal || 0) * 100) / 100 }}千卡</text>
         <text v-if="selectedFood?.customKey" class="food-meta">下方为分量换算，按实际食用克数记录。</text>
         <text v-if="selectedFood && incompleteNutrition(selectedFood)" class="food-meta">营养数据未完善，热量照常计入。</text>
@@ -90,6 +90,8 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import FoodVisual from './FoodVisual.vue'
+import AppIcon from './AppIcon.vue'
 import { validGrams } from '@/utils/input'
 defineProps<{ actionLabel: string }>()
 const search = ref('')
@@ -227,17 +229,21 @@ function confirmAdd(g: number) {
 </script>
 
 <style scoped>
-.food-search { background:var(--wash); border-radius:10rpx; height:max(88rpx,44px); padding:0 24rpx; font-size:max(28rpx,14px); margin-bottom:12rpx; }
-.new-food { color:var(--brand); background:transparent; text-align:left; margin:0 0 8rpx; padding:0 4rpx; line-height:44px; font-size:max(26rpx,13px); }.custom-badge { margin-left:12rpx; font-size:12px; color:var(--muted); font-weight:400; }
+.food-search { background:var(--wash); height:max(88rpx,44px); padding:0 24rpx; margin-bottom:12rpx; }
+.new-food { color:var(--brand); background:transparent; text-align:left; margin:0 0 8rpx; padding:0 4rpx; line-height:44px; }.custom-badge { margin-left:12rpx; font-size:12px; color:var(--muted); font-weight:400; }
 .category-tabs { overflow-x:auto; white-space:nowrap; margin-bottom:8rpx; }
-.tab-item { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; padding:0 22rpx; height:max(88rpx,44px); position:relative; }.tab-text { font-size:max(26rpx,13px); color:var(--muted); }.tab-item.active .tab-text { color:var(--brand); font-weight:600; }.tab-indicator { width:24rpx; height:4rpx; background:var(--brand); position:absolute; bottom:6rpx; }
-.food-card { display:flex; width:100%; align-items:center; justify-content:space-between; text-align:left; padding:20rpx 4rpx; margin:0; line-height:1.6; background:transparent; border-radius:0; border-bottom:1px solid var(--line); }.food-info { flex:1; min-width:0; }.food-name { display:block; font-size:max(30rpx,15px); font-weight:500; color:var(--ink); }.food-meta { display:block; font-size:max(24rpx,12px); color:var(--muted); }.food-add { font-size:36rpx; color:var(--brand); padding:0 12rpx; }.card-touch { background:var(--wash); }
+.tab-item { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; position:relative; }.tab-text { color:var(--muted); }.tab-item.active .tab-text { color:var(--brand); font-weight:600; }.tab-indicator { width:24rpx; height:4rpx; background:var(--brand); position:absolute; bottom:6rpx; }
+.food-card { display:flex; width:100%; align-items:center; justify-content:space-between; text-align:left; margin:0; line-height:1.6; background:transparent; border-radius:0; border-bottom:1px solid var(--line); }.food-info { flex:1; min-width:0; }.food-name { display:block; font-weight:500; color:var(--ink); }.food-meta { display:block; color:var(--muted); }.food-add { font-size:36rpx; color:var(--brand); padding:0 12rpx; }.card-touch { background:var(--wash); }
 .search-empty { display:block; padding:32rpx 0; color:var(--muted); }.expand-foods { color:var(--brand); background:transparent; font-size:max(26rpx,13px); line-height:44px; margin:8rpx 0; }
-.grams-overlay { position:fixed; top:0; left:0; right:0; bottom:var(--window-bottom,0px); z-index:1001; background:rgba(0,0,0,.35); display:flex; align-items:flex-end; justify-content:center; }
-.grams-panel { background:#fff; width:100%; max-width:960rpx; max-height:85vh; overflow-y:auto; border-radius:24rpx 24rpx 0 0; padding:36rpx; padding-bottom:calc(32rpx + env(safe-area-inset-bottom)); }
-.grams-title { display:block; font-size:max(36rpx,18px); font-weight:600; }.grams-subtitle { display:block; color:var(--muted); font-size:max(26rpx,13px); margin:8rpx 0 28rpx; }
-.grams-presets { display:flex; gap:12rpx; margin-bottom:28rpx; }.preset-btn { flex:1; text-align:center; padding:16rpx 0; border:1px solid var(--line); border-radius:10rpx; }.preset-btn.selected { border-color:var(--brand); background:#edf4ef; }.preset-g,.preset-label { display:block; }.preset-g { font-size:max(28rpx,14px); }.preset-label { font-size:max(22rpx,11px); color:var(--muted); }
+.grams-overlay { position:fixed; top:0; left:0; right:0; bottom:var(--window-bottom,0px); z-index:1001; display:flex; align-items:flex-end; justify-content:center; }
+.grams-panel { background:#fff; width:100%; max-height:85vh; overflow-y:auto; padding-bottom:calc(32rpx + env(safe-area-inset-bottom)); }
+.grams-title { display:block; font-weight:600; }.grams-subtitle { display:block; color:var(--muted); }
+.grams-presets { display:flex; margin-bottom:28rpx; }.preset-btn { flex:1; text-align:center; border:1px solid var(--line); }.preset-btn.selected { border-color:var(--brand); background:#edf4ef; }.preset-g,.preset-label { display:block; }.preset-label { color:var(--muted); }
 .grams-divider { margin-bottom:18rpx; }.divider-text { color:var(--muted); font-size:max(24rpx,12px); }.divider-line { display:none; }
-.grams-custom { display:flex; align-items:center; gap:16rpx; }.custom-stepper { display:flex; border:1px solid var(--line); border-radius:10rpx; overflow:hidden; }.stepper-btn { width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--wash); font-size:32rpx; }.stepper-input-wrap { width:150rpx; }.stepper-input { height:44px; width:100%; text-align:center; font-size:32rpx; }.custom-unit { color:var(--muted); }.custom-preview { display:block; font-size:max(28rpx,14px); margin:20rpx 0; }
-.grams-actions { display:flex; gap:16rpx; margin-top:24rpx; }.btn-cancel,.btn-confirm { line-height:44px; min-height:44px; font-size:max(28rpx,14px); border-radius:10rpx; }.btn-cancel { flex:1; background:var(--wash); color:var(--ink); }.btn-confirm { flex:2; background:var(--brand); color:#fff; }
+.grams-custom { display:flex; align-items:center; gap:16rpx; }.custom-stepper { display:flex; border:1px solid var(--line); overflow:hidden; }.stepper-btn { width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--wash); font-size:32rpx; }.stepper-input-wrap { width:150rpx; }.stepper-input { height:44px; width:100%; text-align:center; font-size:32rpx; }.custom-unit { color:var(--muted); }.custom-preview { display:block; font-size:max(28rpx,14px); margin:20rpx 0; }
+.grams-actions { display:flex; gap:16rpx; margin-top:24rpx; }.btn-cancel,.btn-confirm { line-height:44px; min-height:44px; }.btn-cancel { flex:1; background:var(--wash); color:var(--ink); }.btn-confirm { flex:2; background:var(--brand); color:#fff; }
+
+.food-search { border:1px solid var(--line); border-radius:12px; font-size:14px; }.new-food { display:flex; align-items:center; gap:6px; font-size:13px; }.category-tabs { padding:4px 0 10px; }.tab-item { padding:0 12px; border-radius:18px; height:44px; margin-right:4px; transition:background .18s; }.tab-item.active { background:#eaf0e2; }.tab-text { font-size:13px; }.tab-indicator { display:none; }
+.food-card { gap:12px; padding:14px 0; }.food-thumb { flex-shrink:0; width:40px; height:40px; border-radius:12px; overflow:hidden; }.food-name { font-size:14px; overflow-wrap:anywhere; }.food-meta { font-size:12px; }.grams-overlay { background:#1b30254d; }.grams-panel { max-width:600px; padding:24px 20px calc(24px + env(safe-area-inset-bottom)); border-radius:24px 24px 0 0; }.grams-heading { display:flex; align-items:center; gap:12px; }.grams-title { font-size:20px; min-width:0; overflow-wrap:anywhere; }.grams-thumb { width:48px; height:48px; border-radius:14px; overflow:hidden; flex-shrink:0; }.grams-subtitle { font-size:13px; margin:10px 0 22px; }.grams-presets { gap:8px; }.preset-btn { border-radius:12px; min-width:0; padding:12px 4px; transition:background .18s,border-color .18s; }.preset-g { font-size:14px; }.preset-label { font-size:11px; line-height:1.6; margin-top:3px; white-space:normal; }.custom-stepper { border-radius:12px; }.btn-cancel,.btn-confirm { border-radius:12px; font-size:14px; margin:0; }
+@media(max-width:350px) { .grams-panel { padding-left:16px; padding-right:16px; }.food-card { gap:8px; }.food-thumb { width:34px; height:34px; } }
 </style>

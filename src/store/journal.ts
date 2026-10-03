@@ -4,9 +4,10 @@ import { emptyDay, emptyJournal, type JournalData, type JournalDay, type FoodIte
 import { clone, loadJournal, writeJournal, mergeBackup } from '@/utils/journalPersistence'
 import { localDate, validDate } from '@/utils/input'
 import { profileTarget } from '@/utils/calculator'
-import { createEntry, foodPortion, newId } from '@/utils/nutrition'
+import { createEntry, foodPortion, newId, calculatedRecipe } from '@/utils/nutrition'
 import foods from '@/static/foods.json'
 import { createCustomFood, type CustomFoodInput } from '@/utils/customFoods'
+import type { Recipe } from '@/data/recipes'
 
 export const useJournalStore = defineStore('journal', () => {
   const data = ref<JournalData>(emptyJournal(localDate()))
@@ -50,6 +51,21 @@ export const useJournalStore = defineStore('journal', () => {
     selectedDate.value = date; undo.value = null
   }
   function mutate(action: (next: JournalData) => void) { ensureLoaded(); const next = clone(data.value); action(next); commit(next) }
+  function saveCustomRecipe(recipe: Recipe, editingId?: string) {
+    ensureLoaded()
+    if (!recipe.name.trim() || !recipe.ingredients.length) throw new Error('请填写菜名并添加食材')
+    const saved = calculatedRecipe({ ...recipe, name: recipe.name.trim() }, allFoods.value)
+    mutate(next => {
+      if (editingId) {
+        const index = next.customRecipes.findIndex(item => item.id === editingId)
+        if (index < 0 || recipe.id !== editingId) throw new Error('这份菜谱已变化，请关闭后重新打开')
+        next.customRecipes[index] = clone(saved)
+      } else {
+        if (next.customRecipes.some(item => item.id === recipe.id)) throw new Error('菜谱编号重复，请重新创建')
+        next.customRecipes.push(clone(saved))
+      }
+    })
+  }
   function changeDay(date: string, action: (day: JournalDay) => void, label?: string) {
     ensureLoaded()
     if (!validDate(date) || date > localDate()) throw new Error('记录日期无效')
@@ -78,7 +94,7 @@ export const useJournalStore = defineStore('journal', () => {
       const entry = day.entries.find(e => e.id === id)
       if (!entry) throw new Error('记录已变化，请刷新')
       Object.assign(entry, { grams, ...foodPortion(entry.food, grams) })
-    })
+    }, '已修改分量')
   }
   function deleteEntries(date: string, ids: string[]) {
     changeDay(date, day => {
@@ -134,5 +150,5 @@ export const useJournalStore = defineStore('journal', () => {
     uni.removeStorageSync('journal-before-import-v2')
   }
   function recoveryBackup() { return uni.getStorageSync('journal-before-import-v2') as string }
-  return { data, allFoods, addCustomFood, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
+  return { data, allFoods, addCustomFood, saveCustomRecipe, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
 })

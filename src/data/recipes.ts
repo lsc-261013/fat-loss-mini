@@ -10,6 +10,7 @@ export interface Recipe {
   totalProtein: number | null
   totalFat: number | null
   description: string
+  photo?: string
 }
 
 const presetRecipes: Recipe[] = [

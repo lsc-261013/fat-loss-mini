@@ -4,7 +4,7 @@
       "path": "pages/index/index",
       "style": {
         "navigationBarTitleText": "一口一口瘦",
-        "navigationBarBackgroundColor": "#FFFFFF",
+        "navigationBarBackgroundColor": "#F8F7F2",
         "navigationBarTextStyle": "black"
       }
     },
@@ -12,7 +12,7 @@
       "path": "pages/record/index",
       "style": {
         "navigationBarTitleText": "饮食记录",
-        "navigationBarBackgroundColor": "#FFFFFF",
+        "navigationBarBackgroundColor": "#F8F7F2",
         "navigationBarTextStyle": "black"
       }
     },
@@ -20,7 +20,7 @@
       "path": "pages/recipe/index",
       "style": {
         "navigationBarTitleText": "日常食谱",
-        "navigationBarBackgroundColor": "#FFFFFF",
+        "navigationBarBackgroundColor": "#F8F7F2",
         "navigationBarTextStyle": "black"
       }
     },
@@ -28,47 +28,47 @@
       "path": "pages/my/index",
       "style": {
         "navigationBarTitleText": "我的",
-        "navigationBarBackgroundColor": "#FFFFFF",
+        "navigationBarBackgroundColor": "#F8F7F2",
         "navigationBarTextStyle": "black"
       }
     }
   ],
   "tabBar": {
     "color": "#69716c",
-    "selectedColor": "#28745b",
+    "selectedColor": "#2b654b",
     "borderStyle": "white",
     "backgroundColor": "#FFFFFF",
     "list": [
       {
         "pagePath": "pages/index/index",
         "text": "首页",
-        "iconPath": "static/tab/profile.png",
-        "selectedIconPath": "static/tab/profile-active.png"
+        "iconPath": "static/tab/home.png",
+        "selectedIconPath": "static/tab/home-active.png"
       },
       {
         "pagePath": "pages/record/index",
         "text": "记录",
-        "iconPath": "static/tab/record.png",
-        "selectedIconPath": "static/tab/record-active.png"
+        "iconPath": "static/tab/journal.png",
+        "selectedIconPath": "static/tab/journal-active.png"
       },
       {
         "pagePath": "pages/recipe/index",
         "text": "食谱",
-        "iconPath": "static/tab/recipe.png",
-        "selectedIconPath": "static/tab/recipe-active.png"
+        "iconPath": "static/tab/cookbook.png",
+        "selectedIconPath": "static/tab/cookbook-active.png"
       },
       {
         "pagePath": "pages/my/index",
         "text": "我的",
-        "iconPath": "static/tab/my.png",
-        "selectedIconPath": "static/tab/my-active.png"
+        "iconPath": "static/tab/user.png",
+        "selectedIconPath": "static/tab/user-active.png"
       }
     ]
   },
   "globalStyle": {
-    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarBackgroundColor": "#F8F7F2",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#FFFFFF",
+    "backgroundColor": "#F8F7F2",
     "enablePullDownRefresh": true
   }
 }

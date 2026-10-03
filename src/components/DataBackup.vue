@@ -1,11 +1,11 @@
 <template>
   <view class="backup-card">
-    <button class="backup-toggle" @tap="expanded = !expanded">数据备份<text>{{ expanded ? '收起' : '导出 / 导入' }}</text></button><view v-show="expanded"><text class="note">饮食、计划、个人设置、自建食谱和自定义食材都在本机。换设备或清理缓存前，先保存一份备份。</text>
+    <button class="backup-toggle" @tap="expanded = !expanded"><view class="backup-title"><AppIcon name="backup"/>数据备份</view><text>{{ expanded ? '收起' : '导出 / 导入' }}</text></button><view v-show="expanded"><text class="note">饮食、计划、个人设置、自建食谱和自定义食材都在本机。换设备或清理缓存前，先保存一份备份。</text>
     <view class="actions"><button :disabled="busy || !!journal.error" @tap="exportFile">导出备份文件</button><button :disabled="busy || !!journal.error" @tap="chooseFile">选择备份文件</button></view>
-    <text class="note">导入前会显示预览，不会选完就覆盖。备份包含身体数据，请保存在自己信任的位置。</text>
+    <text class="note">导入前会显示预览，不会选完就覆盖。备份包含身体数据和自建菜谱照片，请保存在自己信任的位置。</text>
     <button class="text-button" :disabled="!!journal.error" @tap="copyBackup">下载不方便？复制备份文本</button>
     <button class="text-button" @tap="showText = !showText">{{ showText ? '收起文本导入' : '无法选择文件？粘贴备份文本' }}</button>
-    <view v-if="showText"><textarea v-model="rawText" :maxlength="4194304" placeholder="粘贴本应用导出的 JSON 备份内容" /><button :disabled="!rawText.trim() || busy" @tap="preview(rawText)">校验并预览文本</button></view>
+    <view v-if="showText"><textarea aria-label="备份文本" v-model="rawText" :maxlength="4194304" placeholder="粘贴本应用导出的 JSON 备份内容" /><button :disabled="!rawText.trim() || busy" @tap="preview(rawText)">校验并预览文本</button></view>
     <view v-if="incoming" class="preview">
       <text class="title">导入预览</text><text class="note">{{ counts.days }} 个日期 · {{ counts.entries }} 条记录 · {{ counts.plans }} 项计划 · {{ incoming.customRecipes.length }} 份自建食谱 · {{ incoming.customFoods?.length || 0 }} 种自定义食材</text>
       <text class="note">与本机有 {{ conflicts.days }} 个相同日期、{{ conflicts.items }} 个相同记录或计划编号。</text>
@@ -21,6 +21,7 @@
 </template>
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import AppIcon from './AppIcon.vue'
 import { useJournalStore } from '@/store/journal'
 import { exportBackup, parseBackup } from '@/utils/journalPersistence'
 import { chooseBackupFile, saveBackupFile } from '@/utils/backupFiles'
@@ -70,7 +71,10 @@ function undoImport() { run(async () => { journal.undoImport(); recoveryVersion.
 function exportRecovery() { run(async () => { const saved = JSON.parse(journal.recoveryBackup()); await saveBackupFile(exportBackup(saved.before),'yikou-before-import-'+localDate()+'.json'); feedback('已发起导入前副本保存。') }) }
 </script>
 <style scoped>
-.backup-card { margin-top:28rpx; padding:0; background:white; }.title { display:block; font-size:30rpx; font-weight:700; margin-bottom:16rpx; }.note { display:block; color:#68766f; font-size:25rpx; line-height:1.7; margin:12rpx 0; }
-.actions,.modes { display:flex; gap:12rpx; flex-wrap:wrap; margin:20rpx 0; }button { background:#eaf2e9; color:#28745b; font-size:26rpx; line-height:80rpx; border-radius:14rpx; margin:0; padding:0 18rpx; }.actions button,.modes button { flex:1; }.modes .active { background:#28745b; color:#fff; }.text-button { background:transparent; padding:0; text-align:left; font-size:24rpx; }.preview { border-top:1px solid #dde6da; margin-top:24rpx; padding-top:24rpx; }.feedback { display:block; background:#eaf2e9; color:#28745b; padding:20rpx; border-radius:12rpx; line-height:1.7; }.error { background:#fbede6; color:#a34831; }textarea { width:100%; box-sizing:border-box; background:#f5f6f1; border-radius:12rpx; padding:20rpx; font-size:24rpx; margin:12rpx 0; }.recovery { margin-top:24rpx; }
-.backup-toggle { display:flex; justify-content:space-between; align-items:center; gap:16rpx; width:100%; padding:0; min-height:44px; background:transparent; color:var(--ink); font-size:max(34rpx,17px); font-weight:600; }.backup-toggle text { color:var(--brand); font-size:max(24rpx,12px); font-weight:400; }
+.title { display:block; font-weight:700; margin-bottom:16rpx; }.note { display:block; line-height:1.7; margin:12rpx 0; }
+.actions,.modes { display:flex; flex-wrap:wrap; margin:20rpx 0; }button { background:#eaf2e9; color:#28745b; font-size:26rpx; line-height:80rpx; border-radius:14rpx; margin:0; padding:0 18rpx; }.actions button,.modes button { flex:1; }.modes .active { background:#28745b; color:#fff; }.text-button { background:transparent; }.preview { border-top:1px solid #dde6da; margin-top:24rpx; }.feedback { display:block; padding:20rpx; border-radius:12rpx; line-height:1.7; }.error { background:#fbede6; color:#a34831; }textarea { width:100%; box-sizing:border-box; border-radius:12rpx; margin:12rpx 0; }.recovery { margin-top:24rpx; }
+.backup-toggle { display:flex; justify-content:space-between; align-items:center; gap:16rpx; width:100%; padding:0; min-height:44px; background:transparent; color:var(--ink); font-weight:600; }.backup-toggle text { color:var(--brand); font-weight:400; }
+
+.backup-card { background:var(--surface); padding:18px 20px; border:1px solid var(--line); border-radius:20px; margin-top:20px; }.backup-title { display:flex; align-items:center; gap:10px; }.backup-toggle { font-size:17px; }.note { color:var(--muted); font-size:12px; }.backup-card button { color:var(--brand); background:#eaf0e2; border-radius:12px; font-size:13px; line-height:44px; min-height:44px; }.backup-card .text-button,.backup-card .backup-toggle { background:transparent; }.backup-card .backup-toggle { color:var(--ink); }.backup-card .modes .active { color:#fff; background:var(--brand); }.actions,.modes { gap:8px; }.preview { padding-top:18px; }.title { font-size:16px; }.feedback { color:var(--brand); background:#edf2e5; font-size:13px; }.feedback.error { color:#a34831; background:#fbede6; }textarea { font-size:13px; border:1px solid var(--line); background:var(--wash); padding:12px; }.text-button { font-size:12px; white-space:normal; text-align:left; line-height:1.6 !important; padding:10px 0; }.backup-toggle text { font-size:12px; }
+@media(max-width:350px) { .backup-card { padding:16px; }.backup-card .actions button,.backup-card .modes button { padding:0 10px; font-size:12px; } }
 </style>

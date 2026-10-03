@@ -1,7 +1,7 @@
 <template>
   <view class="custom-food-overlay" @tap="close">
     <view class="custom-food-panel" @tap.stop>
-      <view class="editor-heading"><text>添加新食材</text><button @tap="close">关闭</button></view>
+      <view class="editor-heading"><text>添加新食材</text><button @tap="close" aria-label="关闭新食材"><AppIcon name="close"/></button></view>
       <scroll-view class="editor-body" scroll-y>
         <view class="editor-fields">
           <text class="label">食材名称</text>
@@ -26,6 +26,7 @@
 </template>
 <script setup lang="ts">
 import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
+import AppIcon from './AppIcon.vue'
 import { useJournalStore } from '@/store/journal'
 import { foodCategories, normalizeCustomFood, suggestCategory, type CustomFoodInput } from '@/utils/customFoods'
 import type { CustomFood } from '@/types/journal'
@@ -57,15 +58,18 @@ function save() {
 }
 </script>
 <style scoped>
-.custom-food-overlay { position:fixed; inset:0; z-index:1100; background:rgba(25,31,28,.4); display:flex; align-items:flex-end; justify-content:center; }
-.custom-food-panel { width:100%; max-width:960rpx; height:92vh; height:92dvh; display:flex; flex-direction:column; overflow:hidden; border-radius:24rpx 24rpx 0 0; background:#fff; }
-.editor-heading { display:flex; align-items:center; justify-content:space-between; padding:12rpx 32rpx; border-bottom:1px solid var(--line); font-size:max(34rpx,18px); font-weight:600; }
+.custom-food-overlay { position:fixed; inset:0; z-index:1100; display:flex; align-items:flex-end; justify-content:center; }
+.custom-food-panel { width:100%; height:92vh; height:92dvh; display:flex; flex-direction:column; overflow:hidden; background:#fff; }
+.editor-heading { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); font-weight:600; }
 button { margin:0; min-height:44px; line-height:44px; font-size:max(26rpx,13px); padding:0 20rpx; background:transparent; color:var(--brand); border-radius:8rpx; }
-.editor-body { flex:1; height:0; min-height:0; }.editor-fields { padding:24rpx 32rpx; }.label { display:block; font-size:max(28rpx,14px); font-weight:500; }.hint { display:block; color:var(--muted); font-size:max(24rpx,12px); line-height:1.7; margin:8rpx 0 12rpx; }
+.editor-body { flex:1; height:0; min-height:0; }.label { display:block; font-weight:500; }.hint { display:block; color:var(--muted); line-height:1.7; margin:8rpx 0 12rpx; }
 .field { height:46px; padding:0 20rpx; border:1px solid var(--line); border-radius:8rpx; font-size:16px; margin:12rpx 0 28rpx; }
 .measurement { display:flex; gap:16rpx; }.measure-field { flex:1; min-width:0; display:flex; align-items:center; gap:8rpx; border:1px solid var(--line); border-radius:8rpx; padding:0 16rpx; }.measure-field input { width:0; flex:1; min-width:0; height:46px; font-size:16px; }.measure-field text { color:var(--muted); }
-.unit-row { display:flex; gap:16rpx; margin:12rpx 0; }.unit-row button { border:1px solid var(--line); flex:1; color:var(--muted); }.unit-row .active,.category-options .active { color:var(--brand); background:#edf4ef; border-color:var(--brand); }.conversion { display:block; color:var(--brand); font-size:max(26rpx,13px); margin:12rpx 0 28rpx; }
+.unit-row { display:flex; gap:16rpx; margin:12rpx 0; }.unit-row button { border:1px solid var(--line); flex:1; color:var(--muted); }.unit-row .active,.category-options .active { color:var(--brand); background:#edf4ef; border-color:var(--brand); }.conversion { display:block; color:var(--brand); margin:12rpx 0 28rpx; }
 .category-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12rpx; margin-bottom:28rpx; }.category-options button { border:1px solid var(--line); color:var(--muted); }
 .nutrition-heading { display:flex; align-items:center; gap:16rpx; }.nutrition-heading .hint { margin:0; }.macro-field { display:flex; align-items:center; gap:20rpx; margin:12rpx 0; font-size:max(26rpx,13px); }.macro-field>text:first-child { width:4em; }.macro-field input { flex:1; width:0; min-width:0; border:1px solid var(--line); border-radius:8rpx; padding:0 16rpx; height:44px; font-size:16px; }.end-note { margin-top:24rpx; }
-.editor-footer { padding:16rpx 32rpx calc(20rpx + env(safe-area-inset-bottom)); border-top:1px solid var(--line); flex-shrink:0; }.save { background:var(--brand); color:#fff; width:100%; }
+.editor-footer { border-top:1px solid var(--line); flex-shrink:0; }.save { background:var(--brand); color:#fff; width:100%; }
+
+.custom-food-overlay { background:#1b30254d; }.custom-food-panel { max-width:600px; border-radius:24px 24px 0 0; }.editor-heading { padding:12px 20px; font-size:20px; }.editor-heading button { display:flex; align-items:center; justify-content:center; padding:0; }.editor-fields { padding:20px; }.label { font-size:14px; }.hint { font-size:12px; }.field,.measure-field,.macro-field input { border-radius:12px; }.category-options button,.unit-row button { border-radius:12px; font-size:13px; }.conversion { background:#edf2e5; padding:12px; border-radius:12px; font-size:13px; }.editor-footer { padding:14px 20px calc(18px + env(safe-area-inset-bottom)); }.save { border-radius:12px; font-size:14px; }
+@media(max-width:350px) { .editor-fields,.editor-footer { padding-left:16px; padding-right:16px; } }
 </style>

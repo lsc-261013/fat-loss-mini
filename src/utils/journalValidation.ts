@@ -2,6 +2,7 @@ import type { JournalData } from '@/types/journal'
 import { validDate, validGrams } from './input'
 import foods from '@/static/foods.json'
 import { foodCategories } from './customFoods'
+import { validRecipePhoto, MAX_RECIPE_PHOTO_CHARS } from './recipePhotoData'
 
 function ensure(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message) }
 function object(value: unknown): asserts value is Record<string, unknown> { ensure(value && typeof value === 'object' && !Array.isArray(value), '备份结构不完整') }
@@ -70,8 +71,13 @@ export function validateJournal(value: unknown): asserts value is JournalData {
   object(value.gramsMemory)
   for (const [key, grams] of Object.entries(value.gramsMemory)) { ensure(/^\d+$/.test(key), '分量记忆编号无效'); number(grams, 0, 1e6) }
   array(value.hiddenRecipeIds); value.hiddenRecipeIds.forEach(id => text(id)); array(value.customRecipes, 10000); unique(value.customRecipes)
+  let photoChars = 0
   for (const recipe of value.customRecipes) {
     object(recipe); text(recipe.name); ensure(typeof recipe.description === 'string', '食谱描述无效')
+    if (recipe.photo !== undefined) {
+      ensure(validRecipePhoto(recipe.photo), '食谱照片无效或过大，请使用本应用压缩后的照片')
+      photoChars += recipe.photo.length
+    }
     ensure(['light', 'standard', 'rich'].includes(String(recipe.type)), '食谱类型无效')
     ensure(['breakfast', 'lunch', 'dinner', 'snack'].includes(String(recipe.mealTime)), '餐次无效')
     array(recipe.ingredients, 1000)
@@ -83,4 +89,5 @@ export function validateJournal(value: unknown): asserts value is JournalData {
     number(recipe.totalKcal)
     for (const key of ['totalCarbs', 'totalProtein', 'totalFat']) nullableNumber(recipe[key])
   }
+  ensure(photoChars <= MAX_RECIPE_PHOTO_CHARS, '菜谱照片占用空间较多，请移除一些照片后重试；文字和饮食记录仍会保留')
 }

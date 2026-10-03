@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useJournalStore } from '../journal'
 import { usePlanStore } from '../plan'
 import { useUserStore } from '../user'
+import { useJournalNavigation } from '../journalNavigation'
 import { groupPlans, planGroupAction } from '@/utils/planGroups'
 import { recordingDays } from '@/utils/input'
 import { clone, exportBackup, parseBackup } from '@/utils/journalPersistence'
@@ -47,11 +48,39 @@ describe('recording start date', () => {
 })
 
 describe('whole recipe plans', () => {
+  it('previews a today destination once without changing historical entries', () => {
+    const journal = useJournalStore(); journal.refresh()
+    journal.addEntry('2026-09-25', foods[0], 100)
+    const before = clone(journal.data)
+    journal.selectDate('2026-09-25')
+    uni.switchTab = vi.fn()
+    const navigation = useJournalNavigation()
+    navigation.openToday('plan')
+    expect(journal.selectedDate).toBe(date)
+    expect(navigation.consume()).toBe('plan')
+    expect(navigation.consume()).toBeNull()
+    expect(journal.data).toEqual(before)
+    expect(uni.switchTab).toHaveBeenCalledWith(expect.objectContaining({ url: '/pages/record/index' }))
+  })
   function setup() {
     const journal = useJournalStore(), plan = usePlanStore(); journal.refresh()
     plan.addRecipeGroup(recipes[0].name, recipes[0].ingredients)
     return { journal, plan, groups: () => groupPlans(journal.todayDay.plans, journal.todayDay.entries) }
   }
+  it('edits actual portions independently from plans, persists them and undoes precisely', () => {
+    const { journal, groups } = setup(), group = groups()[0]
+    journal.planAction(date, planGroupAction(groups(), [group.id], 'eat').ids, 'eat')
+    const before = clone(journal.todayDay), first = before.entries[0]
+    journal.updateEntry(date, first.id, 50)
+    expect(journal.todayDay.plans).toEqual(before.plans)
+    expect(sumEntries(journal.todayDay.entries).kcal).toBeCloseTo(421.5)
+    expect(journal.todayDay.entries.slice(1)).toEqual(before.entries.slice(1))
+    expect(JSON.parse(uni.getStorageSync('journal-v2')).days[date].entries[0].grams).toBe(50)
+    expect(journal.undo?.label).toBe('已修改分量')
+    journal.undoDay()
+    expect(journal.todayDay).toEqual(before)
+    expect(JSON.parse(uni.getStorageSync('journal-v2')).days[date].entries).toEqual(before.entries)
+  })
   it('keeps repeated dishes and independent foods separate, preserves IDs through backups', () => {
     const { journal, plan, groups } = setup()
     plan.addRecipeGroup(recipes[0].name, recipes[0].ingredients)

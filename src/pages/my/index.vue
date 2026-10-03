@@ -1,5 +1,6 @@
 <template>
   <view class="my-page">
+    <view class="my-heading"><view><text class="page-eyebrow">身体资料与本机数据</text><text class="page-title">我的</text></view><view class="heading-mark"><AppIcon name="leaf" :size="30"/></view></view>
     <!-- Profile -->
     <view class="form-card">
       <text class="section-title">身体数据</text><text class="form-note">用于估算目标，目前适用于成年女性</text>
@@ -78,6 +79,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import AppIcon from '@/components/AppIcon.vue'
 import DataBackup from '@/components/DataBackup.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { validProfileNumber } from '@/utils/input'
@@ -149,12 +151,17 @@ function onCycleChange(e: any) {
 </script>
 
 <style scoped>
-.my-page { max-width:960rpx; margin:0 auto; padding:28rpx 36rpx 48rpx; }
-.form-card { padding:12rpx 0 24rpx; margin-bottom:20rpx; border-bottom:1px solid var(--line); }.section-title { display:block; font-size:max(34rpx,17px); font-weight:600; margin-bottom:12rpx; }.form-note { display:block; color:var(--muted); font-size:max(24rpx,12px); margin-bottom:20rpx; }
-.input-row,.picker-row { display:flex; align-items:center; gap:12rpx; min-height:100rpx; padding:10rpx 0; }.input-label { font-size:max(28rpx,14px); flex-shrink:0; width:140rpx; }.field-input { flex:1; min-width:0; height:max(84rpx,44px); padding:0 20rpx; background:var(--wash); border-radius:8rpx; text-align:right; font-size:max(30rpx,15px); }.input-unit { width:44rpx; color:var(--muted); font-size:max(24rpx,12px); text-align:right; }
-.picker-row { justify-content:space-between; }.picker-value { display:flex; align-items:center; gap:16rpx; min-height:44px; font-size:max(28rpx,14px); }.picker-arrow,.optional { color:var(--muted); }
-.cycle-advice-card { background:var(--wash); border-radius:10rpx; padding:24rpx; margin-bottom:32rpx; }.advice-title { display:block; font-size:max(28rpx,14px); margin-bottom:12rpx; }.advice-text { color:var(--muted); font-size:max(26rpx,13px); line-height:1.8; }
-.result-card { padding:16rpx 0 28rpx; border-bottom:1px solid var(--line); }.target-big { padding:12rpx 0; }.target-number { font-size:64rpx; font-weight:600; }.target-unit { font-size:max(26rpx,13px); color:var(--muted); margin-left:12rpx; }.target-detail { margin:12rpx 0; }.detail-text,.cycle-tip { display:block; font-size:max(24rpx,12px); color:var(--muted); line-height:1.8; }
-.detail-toggle { margin:0; padding:0; background:transparent; text-align:left; color:var(--brand); font-size:max(24rpx,12px); line-height:44px; }.macro-divider { height:1px; background:var(--line); margin:12rpx 0 24rpx; }.macro-grid { display:flex; }.macro-block { flex:1; }.macro-value { display:block; font-size:32rpx; font-weight:500; }.macro-unit,.macro-tag,.macro-pct { font-size:max(24rpx,12px); color:var(--muted); font-weight:400; }.macro-tag { display:block; margin-top:4rpx; }.macro-pct { margin-top:2rpx; }
-.empty-card { padding:28rpx 0; color:var(--muted); }.local-note { margin:12rpx 0 32rpx; }
+.my-page { margin:0 auto; }
+.form-card { border-bottom:1px solid var(--line); }.section-title { display:block; margin-bottom:12rpx; }.form-note { display:block; color:var(--muted); }
+.input-row,.picker-row { display:flex; align-items:center; gap:12rpx; }.input-label { flex-shrink:0; }.field-input { flex:1; min-width:0; background:var(--wash); text-align:right; }.input-unit { color:var(--muted); text-align:right; }
+.picker-row { justify-content:space-between; }.picker-value { display:flex; align-items:center; gap:16rpx; min-height:44px; }.picker-arrow,.optional { color:var(--muted); }
+.cycle-advice-card { background:var(--wash); }.advice-title { display:block; font-size:max(28rpx,14px); margin-bottom:12rpx; }.advice-text { color:var(--muted); line-height:1.8; }
+.result-card { border-bottom:1px solid var(--line); }.target-big { padding:12rpx 0; }.target-unit { color:var(--muted); margin-left:12rpx; }.target-detail { margin:12rpx 0; }.detail-text,.cycle-tip { display:block; font-size:max(24rpx,12px); color:var(--muted); line-height:1.8; }
+.detail-toggle { margin:0; padding:0; background:transparent; text-align:left; color:var(--brand); font-size:max(24rpx,12px); line-height:44px; }.macro-divider { height:1px; background:var(--line); margin:12rpx 0 24rpx; }.macro-grid { display:flex; }.macro-block { flex:1; }.macro-value { display:block; font-weight:500; }.macro-unit,.macro-tag,.macro-pct { color:var(--muted); font-weight:400; }.macro-tag { display:block; margin-top:4rpx; }.macro-pct { margin-top:2rpx; }
+.empty-card { color:var(--muted); }
+
+.my-page { max-width:620px; padding:24px 20px 36px; }.my-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }.page-title { display:block; font-size:26px; font-weight:650; }.page-eyebrow { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }.heading-mark { display:flex; align-items:center; justify-content:center; width:56px; height:56px; background:#e8eee0; border-radius:50%; }
+.form-card { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:20px; margin-bottom:16px; }.section-title { font-size:17px; font-weight:600; }.form-note { font-size:12px; margin-bottom:8px; }.input-row,.picker-row { min-height:60px; padding:8px 0; }.input-label { width:64px; font-size:14px; }.field-input { height:46px; border-radius:12px; padding:0 14px; font-size:16px; }.input-unit { width:26px; font-size:12px; }.picker-value { font-size:14px; }.local-note { font-size:12px; margin:12px 2px 20px; }
+.cycle-advice-card { border-radius:16px; padding:16px; margin-bottom:16px; }.advice-text { font-size:13px; }.result-card { background:#edf2e5; border:1px solid #dce5d3; border-radius:20px; padding:20px; }.target-number { font-size:38px; font-weight:600; color:var(--brand-deep); }.target-unit { font-size:12px; }.macro-value { font-size:19px; }.macro-unit,.macro-tag,.macro-pct { font-size:12px; }.empty-card { background:var(--wash); border-radius:16px; padding:18px; font-size:13px; line-height:1.8; }
+@media(max-width:350px) { .my-page { padding:20px 16px 28px; }.form-card,.result-card { padding:16px; }.input-label { width:60px; }.picker-value { font-size:13px; } }
 </style>

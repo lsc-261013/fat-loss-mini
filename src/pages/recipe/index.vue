@@ -1,96 +1,26 @@
 <template>
-  <page-meta :page-style="showRecipeBuilder ? 'overflow: hidden;' : ''" />
+  <page-meta :page-style="showRecipeBuilder || detailRecipe || swapping ? 'overflow: hidden;' : ''" />
   <view class="recipe-page">
-    <!-- Summary -->
-    <view v-if="userStore.nutritionTarget" class="gap-card">
-      <text class="gap-title">今天距参考目标</text>
-      <view class="gap-numbers">
-        <view class="gap-item">
-          <text class="gap-value" :class="{ over: remainingKcal < 0 }">{{ Math.abs(remainingKcal) }}</text>
-          <text class="gap-label">{{ remainingKcal >= 0 ? '千卡' : '高于目标 / 千卡' }}</text>
-        </view>
-        <view class="gap-divider" />
-        <view class="gap-item">
-          <text class="gap-value" :class="remainingCarbs !== null && remainingCarbs < 0 ? 'over' : 'ok'">{{ remainingCarbs === null ? '—' : Math.abs(remainingCarbs) }}</text>
-          <text class="gap-label">{{ remainingCarbs === null ? '碳水未完善' : remainingCarbs >= 0 ? '碳水余量 g' : '碳水超出 g' }}</text>
-        </view>
-        <view class="gap-divider" />
-        <view class="gap-item">
-          <text class="gap-value" :class="remainingProtein !== null && remainingProtein < 0 ? 'over' : 'ok'">{{ remainingProtein === null ? '—' : Math.abs(remainingProtein) }}</text>
-          <text class="gap-label">{{ remainingProtein === null ? '蛋白未完善' : remainingProtein >= 0 ? '蛋白余量 g' : '蛋白超出 g' }}</text>
-        </view>
+    <view class="page-heading"><view><text class="page-eyebrow">选一道，安排下一餐</text><text class="page-title">日常食谱</text></view><button class="create-button" @tap="openBuilder()"><AppIcon name="plus" :size="17"/>自建</button></view>
+    <view v-if="userStore.nutritionTarget" class="gap-card"><text>今天{{ remainingKcal >= 0 ? '距参考目标还差' : '高于参考目标' }}</text><text class="gap-number">{{ Math.abs(remainingKcal) }} <text>千卡</text></text><text v-if="remainingCarbs === null || remainingProtein === null" class="gap-note">部分营养未完善</text></view>
+    <view v-if="todayPlanCount && !lastAdded" class="plan-shortcut"><AppIcon name="book"/><view><text class="plan-shortcut-title">今天已安排 {{ todayPlanCount }} 项</text><text class="recipe-hint">{{ planStore.plannedTotal.count }} 项待吃 · 吃过再确认</text></view><button @tap="journalNavigation.openToday('plan')">查看计划 ›</button></view>
+    <view v-if="lastAdded" :key="lastAddedId + todayPlanCount" class="added-receipt content-enter" role="status"><view class="success-icon"><AppIcon name="check" /></view><view class="receipt-copy"><text>已加入：{{ lastAdded }}</text><text class="recipe-hint">已保存到今天计划，尚未计入摄入</text></view><button @tap="journalNavigation.openToday('plan')">去计划 ›</button></view>
+    <view class="filter-row"><view class="meal-filters"><button v-for="filter in mealFilters" :key="filter.key" :class="{active: mealFilter === filter.key}" @tap="mealFilter = filter.key; selectedIds = []">{{ filter.label }}</button></view><button class="manage-button" @tap="manageMode = !manageMode; selectedIds = []">{{ manageMode ? '完成' : '管理' }}</button></view>
+    <view class="recipe-grid">
+      <view v-for="r in visibleRecipes" :key="r.id" class="meal-card surface-panel" :class="{selected:manageMode && selectedIds.includes(r.id)}">
+        <view class="recipe-photo" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><FoodVisual :src="recipeImage(r)" :label="r.name" :caption="recipeImage(r) ? '' : '我的搭配'"/><text class="meal-time-tag">{{ customRecipeIds.has(r.id) ? '自建菜谱' : mealTimeLabel(r.mealTime) }}</text><view v-if="manageMode" class="manage-check" :class="{checked:selectedIds.includes(r.id)}">{{ selectedIds.includes(r.id) ? '✓' : '' }}</view></view>
+        <view class="meal-body"><view class="meal-title-row" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><text class="meal-name">{{ displayDishName(r.name) }}</text><text class="meal-kcal">{{ Math.round(r.totalKcal) }}<text> 千卡</text></text></view><text class="meal-ingredients">{{ getIngredientLabels(r).map(ing => ing.name).join(' · ') }}</text><view class="meal-footer"><view class="meal-links"><button class="detail-link" @tap="openDetail(r)">配料与分量 ›</button><button v-if="!manageMode && customRecipeIds.has(r.id)" class="edit-link" :aria-label="'编辑菜谱' + r.name" @tap="openBuilder(r)">编辑</button></view><button v-if="!manageMode" class="meal-add-plan" :class="{added: lastAddedId === r.id}" @tap="addRecipeToPlan(r)"><AppIcon :name="lastAddedId === r.id ? 'check' : 'plus'" :size="16"/>{{ lastAddedId === r.id ? '再加一份' : '加入计划' }}</button><button v-else class="meal-del-one" @tap="deleteOneRecipe(r.id)">删除</button></view></view>
       </view>
     </view>
-
-    <view class="section-header">
-      <view><text class="section-title">全部食谱</text><text class="recipe-hint">加入今天计划，吃过再确认</text></view>
-      <view style="display:flex;gap:12rpx;">
-        <button class="section-mgr-btn" @tap="manageMode = !manageMode">{{ manageMode ? '完成' : '管理' }}</button>
-        <button class="section-add-btn" @tap="showRecipeBuilder = true">自建</button>
-      </view>
-    </view>
-
-    <view v-for="r in allRecipes" :key="r.id" class="meal-card" :class="{ 'card-manage': manageMode }" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)">
-      <view v-if="manageMode" class="manage-check" :class="{ checked: selectedIds.includes(r.id) }">
-        <text v-if="selectedIds.includes(r.id)">✓</text>
-      </view>
-      <view class="meal-header">
-        <view class="meal-title-row">
-          <text class="meal-time-tag">{{ r.mealTime ? mealTimeLabel(r.mealTime) : '自定义' }}</text>
-          <text class="meal-name">{{ r.name.replace(/^(早餐|午餐|晚餐|加餐)[：:]/, '') }}</text>
-        </view>
-        <view class="meal-type-badge" :class="r.type || 'standard'">{{ typeLabel(r.type || 'standard') }}</view>
-      </view>
-
-      <view class="meal-ingredients">
-        <view v-for="ing in getIngredientLabels(r)" :key="ing.index" class="ingredient-chip">
-          <text class="ing-text">{{ ing.name }} {{ ing.grams }}g</text>
-        </view>
-      </view>
-
-      <view class="meal-footer">
-        <text class="meal-kcal">{{ Math.round(r.totalKcal) }}千卡</text>
-        <button v-if="!manageMode" class="meal-add-plan" @tap.stop="addRecipeToPlan(r)">加入计划</button>
-        <button v-if="manageMode" class="meal-del-one" @tap.stop="deleteOneRecipe(r.id)">删除</button>
-      </view>
-    </view>
-
-    <view v-if="manageMode && selectedIds.length > 0" class="manage-bar">
-      <button class="manage-del-btn" @tap="batchDelete">删除选中 ({{ selectedIds.length }})</button>
-    </view>
-
-    <view v-if="allRecipes.length === 0" class="empty-card">
-      <text class="empty-text">{{ emptyMessage }}</text>
-    </view>
-
+    <view v-if="manageMode && selectedIds.length" class="manage-bar"><button class="manage-del-btn" @tap="batchDelete">删除选中 ({{ selectedIds.length }})</button></view>
+    <view v-if="!visibleRecipes.length" class="empty-card surface-panel"><view class="empty-picture"><FoodVisual /></view><text class="empty-title">{{ allRecipes.length ? '这个分类还没有食谱' : '留一份你的日常搭配' }}</text><text class="recipe-hint">{{ allRecipes.length ? '换个分类看看，或自己创建一份。' : '选择食材与分量，保存自己的菜谱。' }}</text><button class="secondary-action" @tap="openBuilder()">自建菜谱</button></view>
     <button v-if="deletedRecipes" class="secondary-action" @tap="undoRecipeDelete">撤销最近一次删除</button>
-    <!-- Details -->
-    <view v-if="detailRecipe" class="detail-overlay" @tap="detailRecipe = null">
-      <view class="detail-panel" @tap.stop>
-        <text class="detail-title">{{ detailRecipe.name }}</text>
-        <text class="detail-kcal">≈ {{ Math.round(detailRecipe.totalKcal) }} 千卡</text>
-        <text class="detail-sub">点击食材可替换；预设食谱会另存为我的搭配</text>
-        <text v-if="detailRecipe.totalCarbs === null || detailRecipe.totalProtein === null || detailRecipe.totalFat === null" class="detail-sub">部分食材营养数据未完善，热量可正常计算。</text>
-
-        <view class="detail-ingredients">
-          <view
-            v-for="ing in getIngredientLabels(detailRecipe)"
-            :key="ing.index"
-            class="detail-ing-row"
-            @tap="showSwapOptions(ing)"
-          >
-            <view class="ing-icon-dot" :class="ing.category" />
-            <text class="ding-name">{{ ing.name }}</text>
-            <text class="ding-grams">{{ ing.grams }}g</text>
-            <text class="ding-kcal">≈ {{ Math.round(ing.kcal) }}千卡</text>
-            <text class="ding-swap-hint">替换 ›</text>
-          </view>
-        </view>
-
-        <button class="detail-close" @tap="detailRecipe = null">关闭</button>
-      </view>
-    </view>
-
+    <text class="image-note">食物图片为示意，热量来自配料计算。</text>
+    <view v-if="detailRecipe" class="detail-overlay" @tap="detailRecipe = null"><view class="detail-panel content-enter" @tap.stop>
+      <view class="detail-heading"><text>食谱详情</text><button aria-label="关闭食谱详情" @tap="detailRecipe = null"><AppIcon name="close"/></button></view><view class="detail-photo"><FoodVisual :src="recipeImage(detailRecipe)" :label="detailRecipe.name"/></view><text class="detail-title">{{ displayDishName(detailRecipe.name) }}</text><text class="detail-kcal">约 {{ Math.round(detailRecipe.totalKcal) }} 千卡 · {{ detailRecipe.ingredients.length }} 种配料</text><button v-if="customRecipeIds.has(detailRecipe.id)" class="detail-edit" @tap="openBuilder(detailRecipe)">编辑菜谱 · 修改配料或照片</button><text class="detail-sub">点击食材可替换；预设食谱会另存为我的搭配。</text><text v-if="detailRecipe.totalCarbs === null || detailRecipe.totalProtein === null || detailRecipe.totalFat === null" class="detail-sub">部分营养数据未完善，热量照常计算。</text>
+      <view class="detail-ingredients"><view v-for="ing in getIngredientLabels(detailRecipe)" :key="ing.index" class="detail-ing-row" @tap="showSwapOptions(ing)"><view class="ingredient-icon"><FoodVisual :category="ing.category" /></view><view class="ding-info"><text class="ding-name">{{ ing.name }}</text><text class="ding-meta">{{ ing.grams }} g · {{ Math.round(ing.kcal) }} 千卡</text></view><text class="ding-swap-hint">替换 ›</text></view></view>
+      <view v-if="lastAddedId === detailRecipe.id" class="detail-success"><AppIcon name="check" :size="17"/><text>已加入今天计划</text><button @tap="journalNavigation.openToday('plan')">去计划 ›</button></view><button class="primary-action" @tap="addRecipeToPlan(detailRecipe)">{{ lastAddedId === detailRecipe.id ? '再加一份到计划' : '整道加入今天计划' }}</button>
+    </view></view>
     <!-- 食材替换弹窗 -->
     <view v-if="swapping" class="detail-overlay" @tap="swapping = null">
       <view class="swap-panel" @tap.stop>
@@ -124,11 +54,15 @@
       </view>
     </view>
 
-    <RecipeBuilder v-if="showRecipeBuilder" @close="showRecipeBuilder = false" />
+
+    <RecipeBuilder v-if="showRecipeBuilder" :recipe="editingRecipe" @saved="onRecipeSaved" @close="closeBuilder" />
   </view>
 </template>
-
 <script setup lang="ts">
+import FoodVisual from '@/components/FoodVisual.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import { recipeImage, displayDishName } from '@/utils/foodVisuals'
+
 import { useJournalStore } from '@/store/journal'
 import { calculatedRecipe, foodPortion } from '@/utils/nutrition'
 import { ref, computed } from 'vue'
@@ -138,6 +72,8 @@ import { validGrams } from '@/utils/input'
 import { useUserStore } from '@/store/user'
 import { useRecordsStore } from '@/store/records'
 import { usePlanStore } from '@/store/plan'
+import { useJournalNavigation } from '@/store/journalNavigation'
+import { groupPlans } from '@/utils/planGroups'
 import { recipes } from '@/data/recipes'
 import type { Recipe } from '@/data/recipes'
 
@@ -155,6 +91,13 @@ const journal = useJournalStore()
 const userStore = useUserStore()
 const recordsStore = useRecordsStore()
 const planStore = usePlanStore()
+const journalNavigation = useJournalNavigation()
+const lastAdded = ref('')
+const lastAddedId = ref('')
+const mealFilter = ref('all')
+const mealFilters = [{key:'all',label:'全部'},{key:'breakfast',label:'早餐'},{key:'lunch',label:'午餐'},{key:'dinner',label:'晚餐'},{key:'snack',label:'加餐'},{key:'custom',label:'自建'}]
+const visibleRecipes = computed(() => allRecipes.value.filter(recipe => mealFilter.value === 'all' || (mealFilter.value === 'custom' ? customRecipeIds.value.has(recipe.id) : recipe.mealTime === mealFilter.value)))
+const todayPlanCount = computed(() => groupPlans(journal.todayDay.plans, journal.todayDay.entries).length)
 const detailRecipe = ref<Recipe | null>(null)
 const swapping = ref<any>(null)
 const swapOptions = ref<any[]>([])
@@ -206,8 +149,19 @@ function undoRecipeDelete() {
 // 自定义菜谱
 const customRecipes = computed(() => journal.data.customRecipes)
 const showRecipeBuilder = ref(false)
+const editingRecipe = ref<Recipe | null>(null)
+const customRecipeIds = computed(() => new Set(customRecipes.value.map(recipe => recipe.id)))
+function openBuilder(recipe?: Recipe) {
+  editingRecipe.value = recipe || null; detailRecipe.value = null; swapping.value = null
+  showRecipeBuilder.value = true
+}
+function closeBuilder() { showRecipeBuilder.value = false; editingRecipe.value = null }
+function onRecipeSaved(recipe: Recipe) {
+  if (!editingRecipe.value) mealFilter.value = 'custom'
+  if (lastAddedId.value === recipe.id) lastAddedId.value = ''
+}
 function loadCustomRecipes() { journal.refresh() }
-onShow(() => { recordsStore.loadToday(); planStore.loadPlan() })
+onShow(() => { recordsStore.loadToday(); planStore.loadPlan(); lastAdded.value = ''; lastAddedId.value = '' })
 onPullDownRefresh(() => { recordsStore.loadToday(); planStore.loadPlan(); loadCustomRecipes(); uni.stopPullDownRefresh() })
 
 
@@ -231,6 +185,7 @@ function addRecipeToPlan(r: Recipe) {
   })
   try { planStore.addRecipeGroup(r.name, items) }
   catch { uni.showToast({ title: '计划未保存，请检查存储后重试', icon: 'none' }); return }
+  lastAdded.value = displayDishName(r.name); lastAddedId.value = r.id
   uni.showToast({ title: `已把「${r.name}」加入计划`, icon: 'none' })
 }
 
@@ -304,134 +259,21 @@ function doSwap(alt: typeof allFoods.value[number]) {
   uni.showToast({ title: index >= 0 ? '已保存替换' : '已另存为我的搭配', icon: 'none' })
 }
 </script>
-
 <style scoped>
 
+.recipe-page { max-width:820px; margin:0 auto; padding:24px 20px 32px; }.page-heading { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }.page-eyebrow { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }.page-title { display:block; font-size:26px; font-weight:650; letter-spacing:-.5px; }.create-button { display:flex; align-items:center; gap:4px; background:#e9eee3; color:var(--brand); padding:0 13px; line-height:44px; margin:0; border-radius:12px; font-size:13px; }
+.gap-card { display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:12px; margin-bottom:18px; }.gap-number { font-size:18px; color:var(--ink); font-weight:600; }.gap-number text { font-size:12px; font-weight:400; }.gap-note { color:#846b4f; }
+.plan-shortcut,.added-receipt { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid #dce4d5; background:#eff3e9; border-radius:14px; margin-bottom:18px; }.plan-shortcut>view,.receipt-copy { flex:1; min-width:0; }.plan-shortcut-title { display:block; font-size:13px; font-weight:500; }.plan-shortcut button,.added-receipt button { background:transparent; color:var(--brand); padding:0; margin:0; line-height:44px; font-size:12px; white-space:nowrap; }
+.added-receipt { position:sticky; top:calc(var(--window-top,0px) + 8px); z-index:5; box-shadow:0 4px 14px #26352c0c; }.receipt-copy>text:first-child { display:block; font-size:13px; overflow-wrap:anywhere; }.success-icon { display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:#dce9d3; flex-shrink:0; }
+.recipe-hint { display:block; font-size:11px; color:var(--muted); line-height:1.7; margin-top:3px; }.filter-row { display:flex; align-items:center; gap:8px; margin-bottom:16px; }.meal-filters { display:flex; flex:1; min-width:0; overflow-x:auto; gap:8px; padding:2px 0; }.meal-filters button { margin:0; flex-shrink:0; padding:0 13px; line-height:44px; min-height:44px; border-radius:20px; font-size:12px; background:transparent; color:var(--muted); }.meal-filters .active { color:#fff; background:var(--brand); }.manage-button { background:transparent; color:var(--brand); font-size:12px; padding:0 2px; margin:0; }
+.recipe-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; }.meal-card { overflow:hidden; }.meal-card.selected { border-color:var(--brand); }.recipe-photo { height:190px; position:relative; overflow:hidden; }.meal-time-tag { position:absolute; left:14px; top:14px; font-size:11px; color:#48533f; background:#fffef2ed; padding:4px 9px; border-radius:20px; }.manage-check { position:absolute; right:14px; top:14px; width:24px; height:24px; border:1px solid #8d9b85; border-radius:8px; background:#fffffff2; text-align:center; color:#fff; }.manage-check.checked { background:var(--brand); border-color:var(--brand); }
+.meal-body { padding:16px 18px 12px; }.meal-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }.meal-name { font-size:18px; font-weight:650; flex:1; min-width:0; overflow-wrap:anywhere; line-height:1.5; }.meal-kcal { font-size:18px; font-weight:600; color:var(--brand); white-space:nowrap; line-height:1.5; }.meal-kcal text { font-size:11px; font-weight:400; }.meal-ingredients { display:block; margin-top:6px; color:var(--muted); font-size:12px; line-height:1.8; }.meal-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:12px; }.detail-link { color:var(--muted); background:transparent; font-size:12px; padding:0; margin:0; text-align:left; }.meal-add-plan { display:flex; align-items:center; justify-content:center; gap:5px; background:#eaf0e3; color:var(--brand); font-size:13px; border-radius:12px; padding:0 12px; margin:0; line-height:44px; }.meal-add-plan.added { background:#e0ebd7; }.meal-del-one { margin:0; font-size:13px; color:#9e543f; background:#faeee6; }
+.manage-bar { margin-top:16px; }.manage-del-btn { color:#fff; background:#9e543f; width:100%; font-size:14px; border-radius:12px; }.empty-card { padding:24px; text-align:center; }.empty-picture { height:120px; width:140px; border-radius:50%; overflow:hidden; margin:0 auto 20px; }.empty-title { display:block; font-size:17px; font-weight:600; }.image-note { display:block; margin-top:20px; color:var(--muted); font-size:11px; }
+.detail-overlay { position:fixed; inset:0; bottom:var(--window-bottom,0px); z-index:1002; background:#1b30254d; display:flex; align-items:flex-end; justify-content:center; }.detail-panel,.swap-panel { width:100%; max-width:600px; max-height:88vh; overflow-y:auto; overscroll-behavior:contain; background:var(--surface); border-radius:24px 24px 0 0; padding:12px 20px calc(24px + env(safe-area-inset-bottom)); }.detail-heading { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted); }.detail-heading button { display:flex; align-items:center; justify-content:center; background:transparent; margin:0; padding:0; }.detail-photo { height:155px; border-radius:16px; overflow:hidden; margin:4px 0 16px; }.detail-title { display:block; font-size:22px; font-weight:650; overflow-wrap:anywhere; }.detail-kcal { display:block; font-size:14px; color:var(--brand); margin-top:5px; }.detail-sub { display:block; color:var(--muted); font-size:12px; line-height:1.7; margin-top:10px; }.detail-ingredients { margin:12px 0; }.detail-ing-row { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }.ingredient-icon { width:40px; height:40px; overflow:hidden; border-radius:12px; flex-shrink:0; }.ding-info { flex:1; min-width:0; }.ding-name { display:block; font-size:14px; overflow-wrap:anywhere; }.ding-meta { display:block; font-size:12px; color:var(--muted); margin-top:2px; }.ding-swap-hint { color:var(--brand); font-size:12px; white-space:nowrap; }.detail-success { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--brand); }.detail-success button { margin-left:auto; background:transparent; font-size:12px; color:var(--brand); }
+.swap-title { display:block; font-size:20px; font-weight:600; margin:12px 0; overflow-wrap:anywhere; }.swap-grams-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 0; }.swap-grams-label,.swap-preview { font-size:13px; }.swap-stepper { display:flex; align-items:center; border:1px solid var(--line); border-radius:12px; overflow:hidden; }.ss-btn { width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--wash); font-size:18px; }.ss-input { width:70px; height:44px; text-align:center; font-size:16px; }.swap-hint { display:block; color:var(--muted); font-size:13px; margin:12px 0; }.swap-item { display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid var(--line); }.swap-name { font-size:14px; flex:1; min-width:0; overflow-wrap:anywhere; }.swap-kcal { font-size:12px; color:var(--muted); }.detail-close { width:100%; background:var(--wash); font-size:14px; color:var(--ink); margin-top:20px; border-radius:12px; }
+@media(min-width:700px) { .recipe-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.recipe-photo { height:190px; } }
+@media(max-width:350px) { .recipe-page { padding:20px 16px 28px; }.page-title { font-size:24px; }.recipe-photo { height:165px; }.meal-body { padding:14px 14px 10px; }.meal-name { font-size:16px; }.meal-kcal { font-size:16px; }.meal-add-plan { padding:0 10px; font-size:12px; }.detail-panel { padding-left:16px; padding-right:16px; }.receipt-copy>text:first-child { font-size:12px; } }
 
-.ing-emoji { font-size:20rpx; }
-
-/* 管理模式 */
-.card-manage { position:relative; }
-.manage-check.checked { border-color:#28745b; background:#e8f5e9; }
-.manage-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; padding:16rpx 24rpx; border-top:1px solid #eee; padding-bottom:calc(16rpx + env(safe-area-inset-bottom)); z-index:50; }
-.manage-del-btn { background:#ac513b; color:#fff; border:none; border-radius:12rpx; font-size:28rpx; height:80rpx; line-height:80rpx; width:100%; }
-.manage-del-btn::after { border:none; }
-
-.gap-numbers { display: flex; align-items: center; justify-content: space-around; }
-.gap-item { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
-.gap-value { font-size: 32rpx; font-weight: 700; }
-.gap-value.over { color: #ac513b; }
-.gap-value.ok { color: #28745b; }
-.gap-label { font-size: 20rpx; color: #68766f; }
-.gap-divider { width: 1px; height: 48rpx; background: #eee; }
-
-
-/* 食谱卡片 */
-.meal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16rpx; }
-.meal-title-row { display: flex; flex-direction: column; gap: 4rpx; }
-.meal-time-tag { font-size: 22rpx; color: #68766f; }
-.ing-dot { width: 8rpx; height: 8rpx; border-radius: 50%; flex-shrink: 0; }
-.ing-dot.staple { background: #8b6914; }
-.ing-dot.protein { background: #c0392b; }
-.ing-dot.vegetable { background: #2e7d32; }
-.ing-dot.fruit { background: #e67e22; }
-.ing-dot.fat { background: #f9a825; }
-.meal-kcal { font-size: 26rpx; font-weight: 600; color: #233c33; }
-.meal-desc { font-size: 22rpx; color: #68766f; display: block; margin-top: 4rpx; }
-
-/* 食谱详情弹窗 */
-.detail-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,.4); z-index: 100;
-  display: flex; align-items: flex-end; justify-content: center;
-}
-.detail-panel, .swap-panel {
-  background: #fff; border-radius: 24rpx 24rpx 0 0;
-  padding: 32rpx 24rpx 40rpx; width: 100%;
-  max-height: 70vh; overflow-y: auto;
-  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
-}
-.detail-title { font-size: 32rpx; font-weight: 600; display: block; text-align: center; }
-.detail-kcal { font-size: 24rpx; color: #28745b; display: block; text-align: center; margin-top: 4rpx; }
-.detail-sub { font-size: 22rpx; color: #68766f; display: block; text-align: center; margin: 8rpx 0 20rpx; }
-.detail-ingredients { margin-bottom: 24rpx; }
-.detail-ing-row {
-  display: flex; align-items: center; gap: 12rpx;
-  padding: 16rpx 0; border-bottom: 1px solid #f5f5f5;
-}
-.ing-icon-dot { width: 10rpx; height: 10rpx; border-radius: 50%; flex-shrink: 0; }
-.ing-icon-dot.staple { background: #8b6914; }
-.ing-icon-dot.protein { background: #c0392b; }
-.ing-icon-dot.vegetable { background: #2e7d32; }
-.ing-icon-dot.fruit { background: #e67e22; }
-.ing-icon-dot.fat { background: #f9a825; }
-.ding-name { flex: 1; font-size: 26rpx; color: #233c33; }
-.ding-grams { font-size: 24rpx; color: #4d4d4d; }
-.ding-kcal { font-size: 22rpx; color: #68766f; width: 80rpx; text-align: right; }
-.ding-swap-hint { font-size: 22rpx; color: #28745b; }
-
-.detail-close {
-  width: 100%; height: 80rpx; line-height: 80rpx;
-  text-align: center; background: #f5f5f5; border-radius: 16rpx;
-  font-size: 28rpx; color: #4d4d4d; border: none;
-}
-.detail-close::after { border: none; }
-
-/* 替换弹窗 */
-.swap-title { font-size: 30rpx; font-weight: 600; display: block; text-align: center; }
-.swap-hint { font-size: 22rpx; color: #68766f; display: block; text-align: center; margin: 6rpx 0 20rpx; }
-.swap-list { margin-bottom: 24rpx; }
-.swap-item {
-  display: flex; justify-content: space-between;
-  padding: 20rpx 0; border-bottom: 1px solid #f5f5f5;
-}
-.swap-name { font-size: 26rpx; color: #233c33; font-weight: 500; }
-.swap-kcal { font-size: 22rpx; color: #68766f; }
-
-/* 替换弹窗克数调整 */
-.swap-grams-row { display:flex; align-items:center; gap:12rpx; padding:16rpx 0; margin-bottom:8rpx; }
-.swap-grams-label { font-size:24rpx; color:#4d4d4d; }
-.swap-stepper { display:flex; align-items:center; border:1px solid #e0e0e0; border-radius:10rpx; overflow:hidden; }
-.ss-btn { width:48rpx; height:52rpx; display:flex; align-items:center; justify-content:center; background:#f8f8f8; font-size:28rpx; color:#4d4d4d; }
-.ss-input { width:80rpx; height:52rpx; text-align:center; font-size:26rpx; font-weight:600; }
-.swap-preview { font-size:22rpx; color:#28745b; }
-
-.empty-card { background: #fff; border-radius: 16rpx; padding: 48rpx; text-align: center; }
-.empty-text { font-size: 26rpx; color: #68766f; }
-
-.gap-label { font-size:max(24rpx,12px); }
-
-.detail-overlay { z-index: 1002; bottom: var(--window-bottom, 0px); }
-.detail-panel, .swap-panel { box-sizing: border-box; max-height: 85vh; overflow-y: auto; padding-bottom: calc(32rpx + env(safe-area-inset-bottom)); }
-.manage-bar { position: static; margin-bottom: 24rpx; border-radius: 20rpx; }
-.recipe-page { max-width:960rpx; margin:0 auto; padding:24rpx 36rpx 48rpx; }
-.meal-card { padding:28rpx 0; margin:0; border-bottom:1px solid var(--line); background:#fff; border-radius:0; box-shadow:none; }
-.gap-card { padding:24rpx; background:var(--wash); border-radius:12rpx; margin-bottom:36rpx; box-shadow:none; }
-.gap-title { font-size:max(24rpx,12px); color:var(--muted); display:block; margin-bottom:16rpx; }
-.section-title { font-size:max(34rpx,17px); font-weight:600; display:block; margin:0; }
-.section-header { display:flex; justify-content:space-between; align-items:center; gap:12rpx; margin-bottom:0; }
-.section-add-btn { font-size:max(26rpx,13px); color:var(--brand); background:var(--wash); padding:0 20rpx; border-radius:10rpx; border:0; margin:0; min-height:44px; line-height:44px; }
-.section-mgr-btn { font-size:max(26rpx,13px); color:var(--brand); padding:0 12rpx; background:transparent; border:0; margin:0; min-height:44px; line-height:44px; }
-.meal-add-plan { font-size:max(26rpx,13px); color:var(--brand); background:#edf4ef; padding:0 22rpx; border-radius:10rpx; border:0; margin:0 0 0 auto; min-height:44px; line-height:44px; }
-.meal-del-one { font-size:max(26rpx,13px); color:#a34831; background:transparent; margin-left:auto; min-height:44px; line-height:44px; }
-.meal-footer { display:flex; align-items:center; gap:16rpx; padding-top:8rpx; border:0; }
-.ingredient-chip { display:inline-flex; background:transparent; padding:0; border-radius:0; }
-.meal-ingredients { display:flex; flex-wrap:wrap; column-gap:20rpx; row-gap:4rpx; margin:12rpx 0; }
-.ing-text { font-size:max(26rpx,13px); color:var(--muted); }
-.meal-name { font-size:max(34rpx,17px); font-weight:600; color:var(--ink); }
-.meal-type-badge { font-size:max(22rpx,11px); color:var(--muted); padding:0; background:transparent; }
-.meal-type-badge.light { color:var(--muted); background:transparent; }
-.meal-type-badge.standard { color:var(--muted); background:transparent; }
-.meal-type-badge.rich { color:var(--muted); background:transparent; }
-.recipe-hint { display:block; color:var(--muted); font-size:max(22rpx,11px); margin-top:6rpx; }
-.manage-check { position:absolute; top:32rpx; right:0; width:40rpx; height:40rpx; border:1px solid #9aaa9f; border-radius:6rpx; display:flex; align-items:center; justify-content:center; }
-.card-manage .meal-header { padding-right:60rpx; }
-.meal-title-row { min-width:0; }.meal-name { overflow-wrap:anywhere; }
-.detail-panel,.swap-panel { max-width:960rpx; overscroll-behavior:contain; }
-.detail-title,.swap-title { font-size:max(34rpx,17px); }
-.detail-sub,.detail-kcal,.swap-hint,.swap-preview,.swap-kcal,.ding-grams,.ding-kcal,.ding-swap-hint { font-size:max(24rpx,12px); }
-.ding-name,.swap-name { font-size:max(26rpx,13px); min-width:0; overflow-wrap:anywhere; }
-.bfc-kcal { font-size:max(22rpx,11px); color:var(--muted); }
-.ss-btn { width:44px; height:44px; }.ss-input { height:44px; }
-.detail-ing-row,.swap-item { min-height:44px; }
+.meal-links { display:flex; align-items:center; flex-wrap:wrap; column-gap:12px; }.edit-link { margin:0; padding:0; min-height:44px; line-height:44px; background:transparent; color:var(--brand); font-size:12px; }.detail-edit { margin:12px 0 0; padding:0 12px; line-height:44px; min-height:44px; background:var(--wash); color:var(--brand); font-size:13px; border-radius:12px; }
+@media(max-width:350px) { .meal-links { column-gap:10px; }.meal-footer { gap:6px; } }
 </style>
