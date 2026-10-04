@@ -43,3 +43,9 @@ export function planGroupAction(groups: PlanGroup[], selected: string[], action:
     ids: affected.flatMap(group => action === 'remove' ? group.items.map(item => item.id) : action === 'eat' ? group.pendingIds : group.eatenIds),
   }
 }
+
+export function planStatusHint(total: number, pending: number, today = true): string {
+  if (pending > 0) return `${pending} 项待吃 · 吃过再确认`
+  if (total > 0) return `${today ? '今天' : '当日'}的计划已全部确认`
+  return '看看日常搭配，也可以直接记录'
+}

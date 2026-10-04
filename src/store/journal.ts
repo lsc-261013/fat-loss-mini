@@ -80,6 +80,16 @@ export const useJournalStore = defineStore('journal', () => {
       delete recipe.photo
     })
   }
+  function deleteCustomRecipes(ids: string[]) {
+    if (!ids.length) return
+    const selected = new Set(ids)
+    mutate(next => {
+      if ([...selected].some(id => !next.customRecipes.some(recipe => recipe.id === id))) throw new Error('菜谱已变化，或包含不能删除的内置菜谱，请重新选择')
+      // Plan and intake snapshots remain usable without the source recipe/photo.
+      next.customRecipes = next.customRecipes.filter(recipe => !selected.has(recipe.id))
+      next.hiddenRecipeIds = next.hiddenRecipeIds.filter(id => !selected.has(id))
+    })
+  }
   function changeDay(date: string, action: (day: JournalDay) => void, label?: string) {
     ensureLoaded()
     if (!validDate(date) || date > localDate()) throw new Error('记录日期无效')
@@ -164,5 +174,5 @@ export const useJournalStore = defineStore('journal', () => {
     uni.removeStorageSync('journal-before-import-v2')
   }
   function recoveryBackup() { return uni.getStorageSync('journal-before-import-v2') as string }
-  return { data, allFoods, addCustomFood, saveCustomRecipe, hideRecipes, restoreRecipes, removeRecipePhoto, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
+  return { data, allFoods, addCustomFood, saveCustomRecipe, hideRecipes, restoreRecipes, removeRecipePhoto, deleteCustomRecipes, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
 })

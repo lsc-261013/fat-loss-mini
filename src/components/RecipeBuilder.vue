@@ -13,8 +13,8 @@
             <view class="photo-copy"><text class="field-label">菜谱照片 <text class="muted">选填</text></text><text class="photo-hint">{{ photo ? '照片随菜谱保存，也会包含在备份中。' : '放一张自己的成品照，更容易找到这道菜。' }}</text><view class="photo-actions"><button :disabled="photoBusy" @tap="choosePhoto">{{ photoBusy ? '正在处理照片…' : photo ? '更换照片' : '添加照片' }}</button><button v-if="photo" class="remove-photo" :disabled="photoBusy" @tap="photo = ''; photoError = ''">移除</button></view></view>
           </view>
           <text v-if="photoError" class="error" role="alert">{{ photoError }}</text>
-          <view v-if="photoLimitReached" class="photo-limit" role="alert"><text>照片空间不足，隐藏菜谱的照片也计入占用。可以先清理，当前编辑会保留。</text><button @tap="emit('managePhotos')">管理隐藏菜谱 · 清理照片 ›</button></view>
-          <text v-if="recipe" class="edit-note">修改只影响这份菜谱，已加入的计划和饮食记录保持原样。</text>
+          <view v-if="photoLimitReached" class="photo-limit" role="alert"><text>照片空间不足，可以先清理现有或隐藏菜谱的自选照片，当前编辑会保留。</text><button @tap="emit('managePhotos')">管理食谱 · 清理照片 ›</button></view>
+          <text v-if="recipe" class="edit-note">修改不改变旧计划与已吃的文字、分量和热量；关联计划图片跟随菜谱照片。</text>
           <view class="section-heading"><text class="field-label">已选食材 <text class="muted">{{ items.length }}</text></text><text class="muted">约 {{ Math.round(total) }} 千卡</text></view>
           <text v-if="hasUnknownMacros" class="muted">部分食材营养数据未完善，热量仍可计算。</text>
           <text v-if="!items.length" class="empty">从下方选择食材，设置分量后加入。</text>

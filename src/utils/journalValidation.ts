@@ -61,6 +61,8 @@ export function validateJournal(value: unknown): asserts value is JournalData {
       if (plan.foodId >= 100000) ensure(catalogIds.has(plan.foodId), '计划缺少对应的自定义食材')
       number(plan.grams, 0, 1e6); number(plan.kcal); ensure(typeof plan.eaten === 'boolean', '计划状态无效')
       if (plan.groupName !== undefined) text(plan.groupName)
+      // Recipe references are optional and may outlive a deleted recipe.
+      if (plan.recipeId !== undefined) text(plan.recipeId)
     }
   }
   object(value.profile)

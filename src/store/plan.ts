@@ -20,13 +20,13 @@ export const usePlanStore = defineStore('plan', () => {
     if (!food) throw new Error('无法识别食材')
     journal.refresh(); journal.addPlan(journal.today, food, item.grams)
   }
-  function addRecipeGroup(name: string, items: { foodId: number; grams: number }[]) {
+  function addRecipeGroup(name: string, items: { foodId: number; grams: number }[], recipeId?: string) {
     journal.ensureLoaded()
     const groupId = 'grp_' + newId()
     const plans = items.map((item,index) => {
       const food = foods.value.find(f => f.id === item.foodId)
       if (!food) throw new Error('无法识别食材')
-      return { id: groupId+'_'+index, foodId: food.id, foodName: food.name, category: food.category, grams: item.grams, kcal: foodPortion(food,item.grams).subtotalKcal, eaten: false, groupName: name }
+      return { id: groupId+'_'+index, foodId: food.id, foodName: food.name, category: food.category, grams: item.grams, kcal: foodPortion(food,item.grams).subtotalKcal, eaten: false, groupName: name, ...(recipeId ? { recipeId } : {}) }
     })
     journal.refresh(); journal.changeDay(journal.today, day => day.plans.push(...plans))
   }

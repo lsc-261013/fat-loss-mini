@@ -1,12 +1,12 @@
 <template>
   <view class="plans">
-    <view class="heading"><view><text class="title">{{ date === journal.today ? '今日计划' : '当日计划' }}</text><text class="caption">{{ pending.length }} 项待吃，剩余约 {{ Math.round(pending.reduce((s,p) => s+p.pendingKcal,0)) }} 千卡</text></view><button v-if="items.length" @tap="manage = !manage; selected = []">{{ manage ? '完成' : '管理' }}</button></view>
+    <view class="heading"><view><text class="title">{{ date === journal.today ? '今日计划' : '当日计划' }}</text><text class="caption">{{ planStatusHint(items.length, pending.length, date === journal.today) }}{{ pending.length ? ' · 剩余约 ' + Math.round(pending.reduce((s,p) => s+p.pendingKcal,0)) + ' 千卡' : '' }}</text></view><button v-if="items.length" @tap="manage = !manage; selected = []">{{ manage ? '完成' : '管理' }}</button></view>
     <view v-if="!items.length" class="empty"><view class="empty-picture"><FoodVisual /></view><text class="empty-title">给下一餐留个位置</text><text>点「＋ 添加」选食材，或从食谱添加。</text></view>
     <view v-if="manage" class="selection"><button @tap="selected = selected.length === items.length ? [] : items.map(p => p.id)">{{ selected.length === items.length ? '取消全选' : '全选' }}</button><text>已选 {{ selected.length }} 项</text><button :disabled="!pending.length" @tap="run(pending.map(p => p.id), 'eat')">全部待吃记已吃</button></view>
     <view v-for="item in items" :key="item.id" class="plan-item">
     <view class="row" @tap="manage && toggle(item.id)">
       <view v-if="manage" class="check" :class="{ checked: selected.includes(item.id) }">{{ selected.includes(item.id) ? '✓' : '' }}</view>
-      <view class="plan-image"><FoodVisual :src="planImage(item)" :category="item.recipe ? 'dish' : item.items[0].category" :label="item.name"/></view><view class="info"><text class="name">{{ displayDishName(item.name) }}</text><text class="state-tag" :class="item.state">{{ stateLabels[item.state] }}</text><text class="caption">{{ item.recipe ? '整道' : item.items[0].grams + ' g' }} · 计划 {{ Math.round(item.kcal) }} 千卡</text><text v-if="item.eatenIds.length" class="actual-intake">{{ actualIntake(item) }}</text><button v-if="item.recipe" class="ingredients-toggle" @tap.stop="expanded = expanded === item.id ? '' : item.id">{{ expanded === item.id ? '收起计划配料' : '查看计划配料' }} {{ expanded === item.id ? '−' : '+' }}</button><text v-else-if="item.items[0].groupName" class="caption">{{ item.items[0].groupName }} · 旧计划，份次待核对</text></view>
+      <view class="plan-image"><FoodVisual :src="planImage(item, journal.data.customRecipes)" :category="item.recipe ? 'dish' : item.items[0].category" :label="item.name"/></view><view class="info"><text class="name">{{ displayDishName(item.name) }}</text><text class="state-tag" :class="item.state">{{ stateLabels[item.state] }}</text><text class="caption">{{ item.recipe ? '整道' : item.items[0].grams + ' g' }} · 计划 {{ Math.round(item.kcal) }} 千卡</text><text v-if="item.eatenIds.length" class="actual-intake">{{ actualIntake(item) }}</text><button v-if="item.recipe" class="ingredients-toggle" @tap.stop="expanded = expanded === item.id ? '' : item.id">{{ expanded === item.id ? '收起计划配料' : '查看计划配料' }} {{ expanded === item.id ? '−' : '+' }}</button><text v-else-if="item.items[0].groupName" class="caption">{{ item.items[0].groupName }} · 旧计划，份次待核对</text></view>
       <button v-if="!manage" class="eat" :class="{ done: item.state === 'eaten' }" @tap.stop="run([item.id], item.state === 'eaten' ? 'revoke' : 'eat')">{{ item.state === 'eaten' ? '撤回已吃' : item.state === 'partial' ? '记完剩余' : '记已吃' }}</button>
     </view>
     <view class="ingredients-wrap" :class="{open:expanded === item.id}" :aria-hidden="expanded !== item.id"><view class="ingredients-clip"><view class="ingredients"><view v-for="part in item.items" :key="part.id" class="ingredient"><text>{{ part.foodName }} {{ part.grams }} g</text><text>{{ Math.round(planCalories(part)) }} 千卡{{ item.state === 'partial' ? (item.eatenIds.includes(part.id) ? ' · 已吃' : ' · 待吃') : '' }}</text></view></view></view></view>
@@ -21,7 +21,7 @@ import { planImage, displayDishName } from '@/utils/foodVisuals'
 import { computed, ref, watch } from 'vue'
 import { useJournalStore } from '@/store/journal'
 import { planCalories } from '@/utils/nutrition'
-import { groupPlans, planGroupAction, type PlanGroup } from '@/utils/planGroups'
+import { groupPlans, planGroupAction, planStatusHint, type PlanGroup } from '@/utils/planGroups'
 const props = defineProps<{ date: string }>()
 const journal = useJournalStore()
 const manage = ref(false)

@@ -10,6 +10,7 @@ export interface MealEntry {
 export interface PlanItem {
   id: string; foodId: number; foodName: string; grams: number; category: string; kcal: number; eaten: boolean
   groupName?: string
+  recipeId?: string
   children?: { foodId: number; name: string; grams: number; kcal: number; emoji: string }[]
 }
 export interface UserProfile { height: number | null; weight: number | null; age: number | null; activityLevel: number; cyclePhase: string | null }

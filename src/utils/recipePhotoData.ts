@@ -9,7 +9,7 @@ export function recipePhotoChars(recipes: readonly { photo?: string }[]): number
 
 export class RecipePhotoLimitError extends Error {
   constructor() {
-    super('菜谱照片空间不足，请到「隐藏菜谱」清理照片，或移除其他菜谱照片后重试；原数据和草稿保留')
+    super('菜谱照片空间不足，请到「食谱管理」清理自选照片后重试；原数据和草稿保留')
     this.name = 'RecipePhotoLimitError'
   }
 }

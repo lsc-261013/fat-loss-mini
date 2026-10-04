@@ -24,3 +24,26 @@
 | [record-date-320.png](record-date-320.png) | 320px日期箭头保持同一行 |
 
 原始证据在本机项目相邻../r8-finishing-2026-10-04/；容量、清理及草稿操作详见[R8交接](../../ROUND8-FINISHING-HANDOFF.md)。
+
+## R9自建照片与批量管理
+
+2026-10-04，127.0.0.1:5192独立合成H5测试数据，390×844；测试燕麦/长名称菜谱使用既有r2.jpg用于照片链路验证，不代表配料摄影，也不是用户真实照片。
+
+| 文件 | 内容 |
+| --- | --- |
+| [custom-plan-photo-r9-390.png](custom-plan-photo-r9-390.png) | 自建照片在计划显示；源分量修改后旧计划和已吃保留151千卡 |
+| [hidden-batch-r9-390.png](hidden-batch-r9-390.png) | 隐藏列表多选、批量恢复与完整删除自建 |
+
+320px、确认取消/删除空状态、首页和导出对比证据在本机相邻../r9-recipe-management-2026-10-04/。[本轮交接](../../ROUND9-RECIPE-MANAGEMENT-HANDOFF.md)。
+
+## R10交互收尾
+
+2026-10-04，127.0.0.1:5194独立合成H5数据，390×844；非微信截图，未清理5192来源。测试自选照片为项目既有r2.jpg，不是用户上传照片。不同截图取自不同操作时点，不能当作同一份数据的热量前后对照。
+
+| 文件 | 内容与原始来源 |
+| --- | --- |
+| [replacement-r10-390.png](replacement-r10-390.png) | 预设替换白米饭62.5克的预览，尚未保存；../r10-interaction-2026-10-04/replacement-final-390.png |
+| [photo-management-r10-390.png](photo-management-r10-390.png) | 现有自选照片筛选、双类别与容量；../r10-interaction-2026-10-04/management-existing-390.png |
+| [plans-confirmed-r10-390.png](plans-confirmed-r10-390.png) | 全部确认后提示、摄入628及撤回入口；../r10-interaction-2026-10-04/plans-all-confirmed-final-390.png |
+
+320px长名称/空态、桌面、草稿返回和容量证据仅留本机。[R10交接](../../ROUND10-INTERACTION-HANDOFF.md)。未把过程备份JSON或动画初帧截图提交。
