@@ -68,6 +68,8 @@ export function parseBackup(raw: string): JournalData {
   return clone(file.data)
 }
 export function mergeBackup(local: JournalData, incoming: JournalData): JournalData {
+  // Catalog preferences (including preset deletion) remain local during merge.
+  // A full replace restores the backup's preferences instead.
   const next = clone(local)
   const sourceData = clone(incoming)
   const remapped = new Map<number, number>()

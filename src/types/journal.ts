@@ -24,6 +24,7 @@ export interface JournalData {
   version: 2; days: Record<string, JournalDay>; profile: UserProfile; startDate: string
   gramsMemory: Record<string, number>; customRecipes: Recipe[]; hiddenRecipeIds: string[]
   customFoods?: CustomFood[]
+  deletedRecipeIds?: string[]
 }
 export const emptyDay = (): JournalDay => ({ entries: [], plans: [], target: null, targetSource: 'unknown' })
 export const emptyJournal = (date: string): JournalData => ({

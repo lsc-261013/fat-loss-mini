@@ -79,6 +79,10 @@ export function validateJournal(value: unknown): asserts value is JournalData {
   object(value.gramsMemory)
   for (const [key, grams] of Object.entries(value.gramsMemory)) { ensure(/^\d+$/.test(key), '分量记忆编号无效'); number(grams, 0, 1e6) }
   array(value.hiddenRecipeIds); value.hiddenRecipeIds.forEach(id => text(id)); array(value.customRecipes, 10000); unique(value.customRecipes)
+  if (value.deletedRecipeIds !== undefined) {
+    array(value.deletedRecipeIds, 10000); value.deletedRecipeIds.forEach(id => text(id))
+    ensure(new Set(value.deletedRecipeIds).size === value.deletedRecipeIds.length, '备份包含重复删除标记')
+  }
   let photoChars = 0
   for (const recipe of value.customRecipes) {
     object(recipe); text(recipe.name); ensure(typeof recipe.description === 'string', '食谱描述无效')

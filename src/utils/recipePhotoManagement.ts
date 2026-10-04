@@ -2,11 +2,12 @@ import { recipes, type Recipe } from '@/data/recipes'
 import type { useJournalStore } from '@/store/journal'
 
 export type RecipeManagementCategory = 'hidden' | 'existing'
-export function recipeManagementLists(custom: readonly Recipe[], hiddenIds: readonly string[]) {
+export function recipeManagementLists(custom: readonly Recipe[], hiddenIds: readonly string[], deletedIds: readonly string[] = []) {
+  const deleted = new Set(deletedIds)
   const hidden = new Set(hiddenIds)
-  const catalog = [...recipes, ...custom]
+  const catalog = [...recipes, ...custom].filter(recipe => !deleted.has(recipe.id))
   return {
-    hidden: [...hidden].map(id => ({ id, recipe: catalog.find(recipe => recipe.id === id) })),
+    hidden: [...hidden].filter(id => !deleted.has(id)).map(id => ({ id, recipe: catalog.find(recipe => recipe.id === id) })),
     existing: catalog.filter(recipe => !hidden.has(recipe.id)).map(recipe => ({ id: recipe.id, recipe })),
   }
 }
@@ -23,7 +24,7 @@ export function confirmRecipeHiding(journal: ReturnType<typeof useJournalStore>,
   uni.showModal({ title: '移到隐藏食谱？', content: `隐藏选中的 ${targets.length} 份食谱？内置和自建都可恢复，照片仍占空间；已有计划和已吃保留。`, confirmText: '隐藏', success: result => {
     if (!result.confirm) return
     if (revision !== journal.revision) { onError('数据已变化，请重新选择'); return }
-    const existing = new Set(recipeManagementLists(journal.data.customRecipes, journal.data.hiddenRecipeIds).existing.map(item => item.id))
+    const existing = new Set(recipeManagementLists(journal.data.customRecipes, journal.data.hiddenRecipeIds, journal.data.deletedRecipeIds).existing.map(item => item.id))
     if (targets.some(id => !existing.has(id))) { onError('部分食谱已变化，请重新选择'); return }
     try { journal.hideRecipes(targets) } catch (error) { onError(error instanceof Error ? error.message : '隐藏未保存，请重试'); return }
     onHidden(targets)

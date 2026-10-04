@@ -6,14 +6,14 @@
     <view v-if="todayPlanCount && !lastAdded" class="plan-shortcut"><AppIcon name="book"/><view><text class="plan-shortcut-title">今天已安排 {{ todayPlanCount }} 项</text><text class="recipe-hint">{{ planStatusHint(todayPlanCount, planStore.plannedTotal.count) }}</text></view><button @tap="journalNavigation.openToday('plan')">查看计划 ›</button></view>
     <view v-if="lastAdded" :key="lastAddedId + todayPlanCount" class="added-receipt content-enter" role="status"><view class="success-icon"><AppIcon name="check" /></view><view class="receipt-copy"><text>已加入：{{ lastAdded }}</text><text class="recipe-hint">已保存到今天计划，尚未计入摄入</text></view><button @tap="journalNavigation.openToday('plan')">去计划 ›</button></view>
     <view class="filter-row"><view class="meal-filters"><button v-for="filter in mealFilters" :key="filter.key" :class="{active: mealFilter === filter.key}" @tap="mealFilter = filter.key; selectedIds = []">{{ filter.label }}</button></view><button class="manage-button" @tap="manageMode = !manageMode; selectedIds = []">{{ manageMode ? '完成' : '管理' }}</button></view>
-    <view v-if="manageMode" class="hidden-entry"><button @tap="openManagement()">现有 / 隐藏食谱管理 · 隐藏 {{ hiddenRecipeIds.size }} 份 ›</button><text class="recipe-hint">可编辑自己的搭配；隐藏可恢复，完整删除仅适用于自建，已有计划和已吃保留。</text></view>
+    <view v-if="manageMode" class="hidden-entry"><button @tap="openManagement()">现有 / 隐藏食谱管理 · 隐藏 {{ hiddenRecipeIds.size }} 份 ›</button><text class="recipe-hint">可编辑自己的搭配；隐藏可恢复，删除包括内置和自建，已有计划和已吃保留。</text></view>
     <view class="recipe-grid">
       <view v-for="r in visibleRecipes" :key="r.id" class="meal-card surface-panel" :class="{selected:manageMode && selectedIds.includes(r.id)}">
         <view class="recipe-photo" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><FoodVisual :src="recipeImage(r)" :label="r.name" :caption="recipeImage(r) ? '' : '我的搭配'"/><text class="meal-time-tag">{{ customRecipeIds.has(r.id) ? '自建 · ' + mealTimeLabel(r.mealTime) : mealTimeLabel(r.mealTime) }}</text><view v-if="manageMode" class="manage-check" :class="{checked:selectedIds.includes(r.id)}">{{ selectedIds.includes(r.id) ? '✓' : '' }}</view></view>
         <view class="meal-body"><view class="meal-title-row" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><text class="meal-name">{{ displayDishName(r.name) }}</text><text class="meal-kcal">{{ Math.round(r.totalKcal) }}<text> 千卡</text></text></view><text class="meal-ingredients">{{ getIngredientLabels(r).map(ing => ing.name).join(' · ') }}</text><view class="meal-footer"><view class="meal-links"><button class="detail-link" @tap="openDetail(r)">配料与分量 ›</button><button v-if="!manageMode && customRecipeIds.has(r.id)" class="edit-link" :aria-label="'编辑菜谱' + r.name" @tap="openBuilder(r)">编辑</button></view><button v-if="!manageMode" class="meal-add-plan" :class="{added: lastAddedId === r.id}" @tap="addRecipeToPlan(r)"><AppIcon :name="lastAddedId === r.id ? 'check' : 'plus'" :size="16"/>{{ lastAddedId === r.id ? '再加一份' : '加入计划' }}</button></view></view>
       </view>
     </view>
-    <view v-if="manageMode && selectedIds.length" class="manage-bar"><button class="manage-del-btn" @tap="batchDelete">隐藏选中 ({{ selectedIds.length }})</button><button v-if="selectedCustomIds.length" class="manage-del-btn permanent-delete" @tap="deletePermanently(selectedCustomIds)">删除自建 ({{ selectedCustomIds.length }})</button></view>
+    <view v-if="manageMode && selectedIds.length" class="manage-bar"><button class="manage-del-btn" @tap="batchDelete">隐藏选中 ({{ selectedIds.length }})</button><button v-if="selectedIds.length" class="manage-del-btn permanent-delete" @tap="deletePermanently(selectedIds)">删除菜谱 ({{ selectedIds.length }})</button></view>
     <view v-if="!visibleRecipes.length" class="empty-card surface-panel"><view class="empty-picture"><FoodVisual /></view><text class="empty-title">{{ allRecipes.length ? '这个分类还没有食谱' : '留一份你的日常搭配' }}</text><text class="recipe-hint">{{ allRecipes.length ? '换个分类看看，或自己创建一份。' : '选择食材与分量，保存自己的菜谱。' }}</text><button class="secondary-action" @tap="openBuilder()">自建菜谱</button></view>
     <button v-if="deletedRecipes" class="secondary-action" @tap="undoRecipeDelete">撤销最近一次隐藏</button>
     <text class="image-note">食物图片为示意，热量来自配料计算。</text>
@@ -26,14 +26,14 @@
 
 
     <RecipeBuilder v-if="showRecipeBuilder" :recipe="editingRecipe" :meal-filter="mealFilter" @manage-photos="openManagement(true)" @saved="onRecipeSaved" @close="closeBuilder" />
-    <HiddenRecipes v-if="showHiddenRecipes" :editing="showRecipeBuilder" :photo-cleanup="photoCleanupMode" @close="showHiddenRecipes = false" @restored="onHiddenRestored" @deleted="onCustomDeleted" />
+    <HiddenRecipes v-if="showHiddenRecipes" :editing="showRecipeBuilder" :photo-cleanup="photoCleanupMode" @close="showHiddenRecipes = false" @restored="onHiddenRestored" @deleted="onRecipesDeleted" />
   </view>
 </template>
 <script setup lang="ts">
 import FoodVisual from '@/components/FoodVisual.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { recipeImage, displayDishName } from '@/utils/foodVisuals'
-import { confirmCustomRecipeDeletion } from '@/utils/recipeDeletion'
+import { confirmRecipeDeletion } from '@/utils/recipeDeletion'
 
 import { useJournalStore } from '@/store/journal'
 import { calculatedRecipe, foodPortion } from '@/utils/nutrition'
@@ -81,8 +81,8 @@ const showHiddenRecipes = ref(false)
 const photoCleanupMode = ref(false)
 function openManagement(forPhotos = false) { photoCleanupMode.value = forPhotos; showHiddenRecipes.value = true }
 const selectedIds = ref<string[]>([])
-const selectedCustomIds = computed(() => selectedIds.value.filter(id => customRecipeIds.value.has(id)))
-const hiddenRecipeIds = computed(() => new Set(journal.data.hiddenRecipeIds))
+
+const hiddenRecipeIds = computed(() => new Set(journal.data.hiddenRecipeIds.filter(id => !journal.data.deletedRecipeIds?.includes(id))))
 
 function toggleSelect(id: string) {
   const idx = selectedIds.value.indexOf(id)
@@ -137,7 +137,7 @@ function onHiddenRestored(ids: string[]) {
   if (!deletedRecipes.value?.length) deletedRecipes.value = null
   if (!showRecipeBuilder.value) mealFilter.value = 'all'
 }
-function onCustomDeleted(ids: string[]) {
+function onRecipesDeleted(ids: string[]) {
   selectedIds.value = selectedIds.value.filter(id => !ids.includes(id))
   if (deletedRecipes.value) deletedRecipes.value = deletedRecipes.value.filter(id => !ids.includes(id))
   if (!deletedRecipes.value?.length) deletedRecipes.value = null
@@ -145,8 +145,8 @@ function onCustomDeleted(ids: string[]) {
   if (detailRecipe.value && ids.includes(detailRecipe.value.id)) detailRecipe.value = null
 }
 function deletePermanently(ids: string[]) {
-  confirmCustomRecipeDeletion(journal, ids, deleted => {
-    onCustomDeleted(deleted)
+  confirmRecipeDeletion(journal, ids, deleted => {
+    onRecipesDeleted(deleted)
     uni.showToast({ title: '菜谱已删除，历史记录保留', icon: 'none' })
   })
 }
@@ -158,7 +158,7 @@ onPullDownRefresh(() => { recordsStore.loadToday(); planStore.loadPlan(); loadCu
 // 合并系统+自定义
 const allRecipes = computed(() => {
   const all = [...recipes, ...customRecipes.value.map(recipe => calculatedRecipe(recipe, allFoods.value))]
-  return all.filter((r) => !hiddenRecipeIds.value.has(r.id))
+  return all.filter((r) => !hiddenRecipeIds.value.has(r.id) && !journal.data.deletedRecipeIds?.includes(r.id))
 })
 
 function addRecipeToPlan(r: Recipe) {

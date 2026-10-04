@@ -59,3 +59,14 @@
 | [intake-long-r11-320.png](intake-long-r11-320.png) | 缺图长名称、五配料展开、末项修改与撤销；../r11-groups-2026-10-05/intake-long-320.png |
 
 管理空态/长名、桌面、原草稿返回、源删除回退截图及容量/合并字段核对仅留本机。[R11交接](../../ROUND11-EXISTING-INTAKE-HANDOFF.md)。照片容量草稿只验证链路，不代表其配料摄影；未提交合成备份、缓存或日志。
+
+## R12内置与自建统一删除
+
+2026-10-05，独立127.0.0.1:5196实际H5页面、AI合成数据，非微信截图，未改写5192来源。内置照片为项目原有示意图；沿用界面结构，仅统一删除范围/文案及相关空态。R11的「删除自建」截图为历史效果，当前操作以R12为准。
+
+| 文件 | 内容与本机来源 |
+| --- | --- |
+| [existing-delete-r12-390.png](existing-delete-r12-390.png) | 选两份内置，隐藏2/删除菜谱2可用；../r12-delete-all-2026-10-05/01-existing-preset-selection-390.png |
+| [hidden-delete-r12-320.png](hidden-delete-r12-320.png) | 隐藏内置也可勾选删除，恢复/删除入口可达；../r12-delete-all-2026-10-05/03-hidden-preset-selection-320.png |
+
+确认框、混合删除、外层管理、全删空态和兼容/历史字段比对仅留本机；详见[R12交接](../../ROUND12-ALL-RECIPE-DELETION-HANDOFF.md)。不同截图来自不同操作时点，不能当作同一组数据的摄入前后对照。

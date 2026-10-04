@@ -7,7 +7,7 @@ import { profileTarget } from '@/utils/calculator'
 import { createEntry, foodPortion, newId, calculatedRecipe } from '@/utils/nutrition'
 import foods from '@/static/foods.json'
 import { createCustomFood, type CustomFoodInput } from '@/utils/customFoods'
-import type { Recipe } from '@/data/recipes'
+import { recipes, type Recipe } from '@/data/recipes'
 import { captureEntryDishes } from '@/utils/entryGroups'
 
 export const useJournalStore = defineStore('journal', () => {
@@ -68,7 +68,10 @@ export const useJournalStore = defineStore('journal', () => {
     })
   }
   function hideRecipes(ids: string[]) {
-    mutate(next => { next.hiddenRecipeIds = [...new Set([...next.hiddenRecipeIds, ...ids])] })
+    mutate(next => {
+      if (ids.some(id => next.deletedRecipeIds?.includes(id))) throw new Error('部分菜谱已删除，请重新选择')
+      next.hiddenRecipeIds = [...new Set([...next.hiddenRecipeIds, ...ids])]
+    })
   }
   function restoreRecipes(ids: string[]) {
     mutate(next => { next.hiddenRecipeIds = next.hiddenRecipeIds.filter(id => !ids.includes(id)) })
@@ -87,6 +90,21 @@ export const useJournalStore = defineStore('journal', () => {
     mutate(next => {
       if ([...selected].some(id => !next.customRecipes.some(recipe => recipe.id === id))) throw new Error('菜谱已变化，或包含不能删除的内置菜谱，请重新选择')
       // Plan and intake snapshots remain usable without the source recipe/photo.
+      next.customRecipes = next.customRecipes.filter(recipe => !selected.has(recipe.id))
+      next.hiddenRecipeIds = next.hiddenRecipeIds.filter(id => !selected.has(id))
+    })
+  }
+  function deleteRecipes(ids: string[]) {
+    if (!ids.length) return
+    const selected = new Set(ids)
+    mutate(next => {
+      const presets = new Set(recipes.map(recipe => recipe.id))
+      const custom = new Set(next.customRecipes.map(recipe => recipe.id))
+      if ([...selected].some(id => next.deletedRecipeIds?.includes(id) || (!presets.has(id) && !custom.has(id)))) throw new Error('部分菜谱已变化，请重新选择')
+      // Preset definitions stay available to historical snapshots; the tombstone
+      // removes them from this device's catalog across reloads and backups.
+      const deletedPresets = [...selected].filter(id => presets.has(id))
+      if (deletedPresets.length) next.deletedRecipeIds = [...new Set([...(next.deletedRecipeIds || []), ...deletedPresets])]
       next.customRecipes = next.customRecipes.filter(recipe => !selected.has(recipe.id))
       next.hiddenRecipeIds = next.hiddenRecipeIds.filter(id => !selected.has(id))
     })
@@ -177,5 +195,5 @@ export const useJournalStore = defineStore('journal', () => {
     uni.removeStorageSync('journal-before-import-v2')
   }
   function recoveryBackup() { return uni.getStorageSync('journal-before-import-v2') as string }
-  return { data, allFoods, addCustomFood, saveCustomRecipe, hideRecipes, restoreRecipes, removeRecipePhoto, deleteCustomRecipes, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
+  return { data, allFoods, addCustomFood, saveCustomRecipe, hideRecipes, restoreRecipes, removeRecipePhoto, deleteCustomRecipes, deleteRecipes, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
 })

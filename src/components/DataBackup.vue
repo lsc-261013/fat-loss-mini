@@ -10,7 +10,7 @@
       <text class="title">导入预览</text><text class="note">{{ counts.days }} 个日期 · {{ counts.entries }} 条记录 · {{ counts.plans }} 项计划 · {{ incoming.customRecipes.length }} 份自建食谱 · {{ incoming.customFoods?.length || 0 }} 种自定义食材</text>
       <text class="note">与本机有 {{ conflicts.days }} 个相同日期、{{ conflicts.items }} 个相同记录或计划编号。</text>
       <view class="modes"><button :class="{ active: mode === 'merge' }" @tap="mode = 'merge'">合并保留本机</button><button :class="{ active: mode === 'replace' }" @tap="mode = 'replace'">完整恢复备份</button></view>
-      <text class="note">{{ mode === 'merge' ? '补入缺少的日期、记录、计划、食谱和自定义食材。同一记录、计划或菜份保留本机版本；菜份冲突时整份不补入，以免复活已删明细。不同的自定义食材分别保留。本机个人设置、日期目标和隐藏食谱状态保留。' : '用备份替换当前全部数据和设置。导入前会保存本机副本，之后可导出；没有新操作时可直接撤销。' }}</text>
+      <text class="note">{{ mode === 'merge' ? '补入缺少的日期、记录、计划、食谱和自定义食材。同一记录、计划或菜份保留本机版本；菜份冲突时整份不补入，以免复活已删明细。不同的自定义食材分别保留。本机个人设置、日期目标、隐藏状态及内置菜谱删除状态保留。' : '用备份替换当前全部数据和设置。导入前会保存本机副本，之后可导出；没有新操作时可直接撤销。' }}</text>
       <view class="actions"><button @tap="incoming = null">取消</button><button :disabled="busy" @tap="applyImport">确认{{ mode === 'merge' ? '合并' : '恢复' }}</button></view>
     </view>
     <text v-if="message" class="feedback" :class="{ error: failed }">{{ message }}</text>

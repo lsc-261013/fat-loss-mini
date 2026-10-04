@@ -6,21 +6,21 @@
         <view class="photo-budget"><view><text>照片已用 {{ formatSize(totalChars) }} KB</text><text class="budget-number">可用 {{ formatSize(MAX_RECIPE_PHOTO_CHARS - totalChars) }} KB</text></view><text class="hidden-note">隐藏照片 {{ formatSize(hiddenChars) }} KB · 内置示意图不占空间</text></view>
         <view class="management-tabs" role="group" aria-label="食谱管理类别"><button :class="{ active: active === 'hidden' }" :aria-pressed="active === 'hidden'" @tap="active = 'hidden'">隐藏食谱 ({{ hidden.length }})</button><button :class="{ active: active === 'existing' }" :aria-pressed="active === 'existing'" @tap="active = 'existing'">现有食谱 ({{ existing.length }})</button></view>
         <button v-if="active === 'existing'" class="photo-filter" :class="{ active: onlyPhotos }" :aria-pressed="onlyPhotos" @tap="onlyPhotos = !onlyPhotos">{{ onlyPhotos ? '✓ ' : '' }}只看有自选照片</button>
-        <text v-else class="hidden-note">隐藏可恢复；完整删除仅适用于自建，已有计划和已吃保留。</text>
+        <text v-else class="hidden-note">隐藏可恢复；删除包括内置和自建，已有计划和已吃保留。</text>
       </view>
       <scroll-view class="hidden-body" scroll-y>
         <view class="hidden-content">
           <text v-if="feedback" class="hidden-feedback" :class="{ error: failed }" role="status">{{ feedback }}</text>
-          <view v-if="!currentItems.length" class="hidden-empty"><AppIcon name="dish" :size="32" /><text>{{ active === 'hidden' ? '没有隐藏的菜谱' : onlyPhotos ? '现有食谱没有自选照片' : '没有现有食谱' }}</text><text class="hidden-note">{{ active === 'hidden' ? '现有菜谱的照片可在旁边分类清理。' : onlyPhotos ? '可切换到隐藏食谱查看，或关闭筛选浏览全部。' : '可切换到隐藏食谱恢复菜谱。' }}</text></view>
+          <view v-if="!currentItems.length" class="hidden-empty"><AppIcon name="dish" :size="32" /><text>{{ active === 'hidden' ? '没有隐藏的菜谱' : onlyPhotos ? '现有食谱没有自选照片' : '没有现有食谱' }}</text><text class="hidden-note">{{ active === 'hidden' ? '现有菜谱的照片可在旁边分类清理。' : onlyPhotos ? '可切换到隐藏食谱查看，或关闭筛选浏览全部。' : hidden.length ? '可切换到隐藏食谱恢复菜谱。' : '可返回食谱页自建新的搭配。' }}</text></view>
           <view v-if="manage" class="hidden-selection"><button @tap="selected = selected.length === currentItems.length ? [] : currentItems.map(item => item.id)">{{ selected.length === currentItems.length ? '取消全选' : '全选' }}</button><text>已选 {{ selected.length }} 项</text></view>
           <view v-for="item in currentItems" :key="item.id" class="hidden-item">
             <view class="hidden-row" @tap="manage && toggle(item.id)"><button v-if="manage" class="hidden-selector" :aria-label="'选择' + (item.recipe?.name || '旧菜谱')" :aria-pressed="selected.includes(item.id)" @tap.stop="toggle(item.id)"><text class="hidden-check" :class="{ checked: selected.includes(item.id) }">{{ selected.includes(item.id) ? '✓' : '' }}</text></button><view class="hidden-photo"><FoodVisual :src="item.recipe ? recipeImage(item.recipe) : ''" :label="item.recipe?.name || '旧菜谱'" /></view><view class="hidden-copy"><text class="hidden-name">{{ item.recipe ? displayDishName(item.recipe.name) : '暂不可识别的旧菜谱' }}</text><text class="hidden-note">{{ item.recipe ? recipeMealLabel(item.recipe.mealTime) : '原菜谱已不在当前库中，恢复仅移除隐藏标记。' }}</text><text class="hidden-note">{{ item.recipe?.photo ? '自选照片 ' + formatSize(item.recipe.photo.length) + ' KB' : '无自选照片，不占照片配额' }}</text></view></view>
-            <view v-if="!manage" class="hidden-actions"><template v-if="active === 'existing' && item.recipe"><button v-if="customIds.has(item.id)" :disabled="secondaryCleanup" :aria-label="'编辑菜谱' + item.recipe.name" @tap="openSecondary(item.recipe, false)">编辑菜谱</button><template v-else><button @tap="expanded = expanded === item.id ? '' : item.id">{{ expanded === item.id ? '收起配料' : '查看配料' }}</button><button :disabled="secondaryCleanup" @tap="openSecondary(item.recipe, true)">另存我的搭配</button></template></template><button v-if="active === 'hidden'" @tap="restore([item.id])">{{ item.recipe ? '恢复显示' : '移除隐藏标记' }}</button><button v-if="active === 'hidden' && customIds.has(item.id)" class="clear-photo" @tap="deleteRecipes([item.id])">删除菜谱</button><button v-if="item.recipe?.photo" class="photo-only" @tap="removePhoto(item.recipe)">仅移除照片</button></view>
+            <view v-if="!manage" class="hidden-actions"><template v-if="active === 'existing' && item.recipe"><button v-if="customIds.has(item.id)" :disabled="secondaryCleanup" :aria-label="'编辑菜谱' + item.recipe.name" @tap="openSecondary(item.recipe, false)">编辑菜谱</button><template v-else><button @tap="expanded = expanded === item.id ? '' : item.id">{{ expanded === item.id ? '收起配料' : '查看配料' }}</button><button :disabled="secondaryCleanup" @tap="openSecondary(item.recipe, true)">另存我的搭配</button></template></template><button v-if="active === 'hidden'" @tap="restore([item.id])">{{ item.recipe ? '恢复显示' : '移除隐藏标记' }}</button><button v-if="active === 'hidden' && item.recipe" class="clear-photo" @tap="deleteRecipes([item.id])">删除菜谱</button><button v-if="item.recipe?.photo" class="photo-only" @tap="removePhoto(item.recipe)">仅移除照片</button></view>
             <view v-if="!manage && expanded === item.id && item.recipe" class="management-detail"><text class="hidden-note">约 {{ Math.round(item.recipe.totalKcal) }} 千卡 · {{ item.recipe.ingredients.length }} 种配料</text><view v-for="(part, index) in item.recipe.ingredients" :key="index"><text>{{ ingredientName(part.foodId) }} {{ part.grams }} g</text><text>{{ ingredientCalories(part.foodId, part.grams) }} 千卡</text></view></view>
           </view>
         </view>
       </scroll-view>
-      <view class="hidden-footer"><view v-if="manage" class="hidden-batch"><button :disabled="!selected.length" @tap="active === 'hidden' ? restore(selected) : hideSelected()">{{ active === 'hidden' ? '恢复选中' : '隐藏选中' }} ({{ selected.length }})</button><button class="clear-photo" :disabled="!selectedCustom.length" @tap="deleteRecipes(selectedCustom)">删除自建 ({{ selectedCustom.length }})</button><text class="hidden-note">隐藏/恢复包含内置和自建；完整删除只包含选中的自建。</text></view><button @tap="closeManagement">{{ secondaryCleanup ? '返回这份编辑 · 草稿保留' : editing ? '返回原编辑 · 草稿保留' : '完成' }}</button></view>
+      <view class="hidden-footer"><view v-if="manage" class="hidden-batch"><button :disabled="!selected.length" @tap="active === 'hidden' ? restore(selected) : hideSelected()">{{ active === 'hidden' ? '恢复选中' : '隐藏选中' }} ({{ selected.length }})</button><button class="clear-photo" :disabled="!selectedDeletable.length" @tap="deleteRecipes(selectedDeletable)">删除菜谱 ({{ selectedDeletable.length }})</button><text class="hidden-note">删除包括内置和自建；已有计划和已吃保留。</text></view><button @tap="closeManagement">{{ secondaryCleanup ? '返回这份编辑 · 草稿保留' : editing ? '返回原编辑 · 草稿保留' : '完成' }}</button></view>
     </view>
     <view v-if="secondary" v-show="!secondaryCleanup" class="secondary-editor" @tap.stop><RecipeBuilder :key="secondary.recipe.id + secondary.copy" :recipe="secondary.copy ? null : secondary.recipe" :seed="secondary.copy ? secondary.recipe : null" @close="secondary = null; secondaryCleanup = false" @saved="secondarySaved" @manage-photos="cleanSecondaryPhotos" /></view>
   </view>
@@ -34,7 +34,7 @@ import RecipeBuilder from './RecipeBuilder.vue'
 import { useJournalStore } from '@/store/journal'
 import type { Recipe } from '@/data/recipes'
 import { recipeImage, displayDishName } from '@/utils/foodVisuals'
-import { confirmCustomRecipeDeletion } from '@/utils/recipeDeletion'
+import { confirmRecipeDeletion } from '@/utils/recipeDeletion'
 import { recipeMealLabel } from '@/utils/recipeMeals'
 import { recipePhotoChars, MAX_RECIPE_PHOTO_CHARS } from '@/utils/recipePhotoData'
 import { recipeManagementLists, photoCleanupCategory, formatPhotoSpace, confirmRecipePhotoRemoval, confirmRecipeHiding, type RecipeManagementCategory } from '@/utils/recipePhotoManagement'
@@ -47,8 +47,8 @@ const feedback = ref(''), failed = ref(false)
 const manage = ref(false), selected = ref<string[]>([])
 const secondary = ref<{ recipe: Recipe; copy: boolean } | null>(null), secondaryCleanup = ref(false), expanded = ref('')
 const customIds = computed(() => new Set(journal.data.customRecipes.map(recipe => recipe.id)))
-const selectedCustom = computed(() => selected.value.filter(id => customIds.value.has(id)))
-const lists = computed(() => recipeManagementLists(journal.data.customRecipes, journal.data.hiddenRecipeIds))
+const selectedDeletable = computed(() => selected.value.filter(id => currentItems.value.some(item => item.id === id && item.recipe)))
+const lists = computed(() => recipeManagementLists(journal.data.customRecipes, journal.data.hiddenRecipeIds, journal.data.deletedRecipeIds))
 const hidden = computed(() => lists.value.hidden), existing = computed(() => lists.value.existing)
 const active = ref<RecipeManagementCategory>(props.photoCleanup ? photoCleanupCategory(journal.data.customRecipes, journal.data.hiddenRecipeIds) : 'hidden')
 const onlyPhotos = ref(!!props.photoCleanup)
@@ -89,7 +89,7 @@ function restore(ids: string[]) {
   }
 }
 function deleteRecipes(ids: string[]) {
-  confirmCustomRecipeDeletion(journal, ids, deleted => {
+  confirmRecipeDeletion(journal, ids, deleted => {
     feedback.value = deleted.length + ' 份菜谱已完整删除，已有计划和已吃保留。'
     failed.value = false; selected.value = []; emit('deleted', deleted)
   }, message => { feedback.value = message; failed.value = true })
