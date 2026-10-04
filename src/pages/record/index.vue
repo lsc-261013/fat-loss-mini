@@ -8,7 +8,7 @@
     <CalorieCard compact :label="isToday ? '今天已记录' : '当日已记录'" :target="day.target?.targetCalories" :consumed="total.kcal" :macros="macroPayload" />
     <view v-if="!day.target" class="target-note"><button v-if="isToday" class="text-button" @tap="openProfile">设置参考目标 ›</button><text v-else>这一天未保存参考目标</text></view>
     <view class="journal-toolbar">
-      <view class="journal-tabs"><view class="tab-slider" :class="{ plan: activeList === 'plan' }"/><button :class="{ active: activeList === 'record' }" @tap="switchList('record')">已吃 <text>{{ day.entries.length }}</text></button><button :class="{ active: activeList === 'plan' }" @tap="switchList('plan')">计划 <text>{{ planCount }}</text></button></view>
+      <view class="journal-tabs"><view class="tab-slider" :class="{ plan: activeList === 'plan' }"/><button :class="{ active: activeList === 'record' }" @tap="switchList('record')">已吃 <text>{{ entryGroups.length }}</text></button><button :class="{ active: activeList === 'plan' }" @tap="switchList('plan')">计划 <text>{{ planCount }}</text></button></view>
       <button class="add-button" :disabled="!!journal.error" @tap="adding = !adding; addMode = activeList">{{ adding ? '取消添加' : '＋ 添加' }}</button>
     </view>
     <view v-if="adding && !journal.error" class="add-panel">
@@ -16,16 +16,12 @@
       <FoodPicker :key="journal.selectedDate + addMode" :action-label="addMode === 'record' ? '保存记录' : '加入计划'" @add="onAddFood" />
     </view>
     <view v-if="activeList === 'record'" class="section-card content-enter">
-      <view class="section-head"><view><text class="section-caption">{{ day.entries.length ? day.entries.length + ' 条食材明细 · 合计 ' + Math.round(total.kcal) + ' 千卡' : '饮食明细' }}</text></view><button v-if="day.entries.length" class="text-button" @tap="manageMode = !manageMode; selectedIds = []">{{ manageMode ? '完成' : '管理' }}</button></view>
-      <text v-if="day.entries.some(entry => entry.planItemId)" class="section-caption">整道菜按配料记录，可分别调整实际吃下的分量。</text>
+      <view class="section-head"><view><text class="section-caption">{{ entryGroups.length ? entryGroups.length + ' 项已吃 · 合计 ' + Math.round(total.kcal) + ' 千卡' : '饮食明细' }}</text></view><button v-if="entryGroups.length" class="text-button" @tap="manageMode = !manageMode; selectedIds = []">{{ manageMode ? '完成' : '管理' }}</button></view>
+      <text v-if="entryGroups.some(group => group.dish)" class="section-caption">每份菜独立记录，食材分量可分别修改。</text>
       <view v-if="!day.entries.length" class="empty-state"><view class="empty-picture"><FoodVisual /></view><text class="empty-title">{{ isToday ? '今天还没有记录' : '这一天还没有记录' }}</text><text>点「＋ 添加」，选择食物和分量。</text></view>
-      <button v-if="manageMode" class="text-button" @tap="selectedIds = selectedIds.length === day.entries.length ? [] : day.entries.map(e => e.id)">{{ selectedIds.length === day.entries.length ? '取消全选' : '全选记录' }}</button>
-      <view v-for="entry in day.entries" :key="entry.id" class="entry-row" @tap="manageMode && toggleSelect(entry.id)">
-        <view v-if="manageMode" class="check" :class="{ checked: selectedIds.includes(entry.id) }">{{ selectedIds.includes(entry.id) ? '✓' : '' }}</view>
-        <view class="entry-icon"><FoodVisual :category="entry.food.category" :label="entry.food.name"/></view><view class="entry-info"><text class="entry-name">{{ entry.food.name }}</text><text v-if="incompleteNutrition(entry.food)" class="entry-meta">营养数据未完善 · 热量已计入</text><text class="entry-meta">{{ entry.grams }} g</text><text v-if="entry.planItemId" class="entry-meta">{{ entrySource(entry) }}</text></view>
-        <view class="entry-actions"><text class="entry-kcal">{{ Math.round(entry.subtotalKcal) }} <text>千卡</text></text><button v-if="!manageMode" class="text-button" @tap.stop="editing = { entry, date: journal.selectedDate }">修改</button></view>
-      </view>
-      <button v-if="manageMode" class="delete-button" :disabled="!selectedIds.length" @tap="deleteSelected">删除选中 ({{ selectedIds.length }})</button>
+      <view v-if="manageMode" class="entry-selection"><button class="text-button" @tap="selectedIds = selectedIds.length === entryGroups.length ? [] : entryGroups.map(group => group.id)">{{ selectedIds.length === entryGroups.length ? '取消全选' : '全选已吃项' }}</button><text class="section-caption">已选 {{ selectedIds.length }} 项 · {{ selectedEntries.details }} 条实际明细</text></view>
+      <EntryGroupCard v-for="group in entryGroups" :key="group.id" :group="group" :custom-recipes="journal.data.customRecipes" :manage="manageMode" :selected="selectedIds.includes(group.id)" @select="toggleSelect(group.id)" @edit="editing = { entry: $event, date: journal.selectedDate }" />
+      <button v-if="manageMode" class="delete-button" :disabled="!selectedIds.length" @tap="deleteSelected">删除选中 ({{ selectedIds.length }} 项)</button>
     </view>
     <PlanManager class="content-enter" v-if="activeList === 'plan'" :date="journal.selectedDate" />
     <view v-if="journal.undo && journal.undo.date === journal.selectedDate" class="undo-row"><text>{{ journal.undo.label }}</text><button class="text-button" @tap="safely(() => journal.undoDay(), '已恢复')">撤销刚才操作</button></view>
@@ -41,11 +37,13 @@ import AppIcon from '@/components/AppIcon.vue'
 import CalorieCard from '@/components/CalorieCard.vue'
 import FoodPicker from '@/components/FoodPicker.vue'
 import EntryEditor from '@/components/EntryEditor.vue'
+import EntryGroupCard from '@/components/EntryGroupCard.vue'
 import PlanManager from '@/components/PlanManager.vue'
 import { useJournalStore } from '@/store/journal'
 import { useJournalNavigation } from '@/store/journalNavigation'
-import { sumEntries, incompleteNutrition } from '@/utils/nutrition'
+import { sumEntries } from '@/utils/nutrition'
 import { groupPlans } from '@/utils/planGroups'
+import { groupEntries, selectedEntryGroups } from '@/utils/entryGroups'
 import { shiftDate } from '@/utils/input'
 import type { FoodItem, MealEntry } from '@/types/journal'
 const journal = useJournalStore()
@@ -58,6 +56,9 @@ const manageMode = ref(false)
 const selectedIds = ref<string[]>([])
 const editing = ref<{ entry: MealEntry; date: string } | null>(null)
 const day = computed(() => journal.currentDay)
+const entryGroups = computed(() => groupEntries(day.value.entries, day.value.plans))
+const selectedEntries = computed(() => selectedEntryGroups(entryGroups.value, selectedIds.value))
+watch(entryGroups, groups => { selectedIds.value = selectedIds.value.filter(id => groups.some(group => group.id === id)); if (!groups.length) manageMode.value = false })
 const planCount = computed(() => groupPlans(day.value.plans, day.value.entries).length)
 const total = computed(() => sumEntries(day.value.entries))
 const isToday = computed(() => journal.selectedDate === journal.today)
@@ -70,7 +71,6 @@ watch(() => journal.selectedDate, () => { editing.value = null; adding.value = f
 onShow(() => { journal.refresh(); const list = journalNavigation.consume(); if (list) switchList(list) })
 onPullDownRefresh(() => { journal.refresh(); uni.stopPullDownRefresh() })
 function openProfile() { uni.switchTab({ url: '/pages/my/index' }) }
-function entrySource(entry: MealEntry) { const plan = day.value.plans.find(item => item.id === entry.planItemId); return plan?.groupName ? plan.groupName.replace(/^(早餐|午餐|晚餐|加餐)[：:]/, '') : '来自计划' }
 function changeDate(date: string) { safely(() => journal.selectDate(date)) }
 function onDatePick(event: { detail: { value: string } }) { changeDate(event.detail.value) }
 function onSavedPick(event: { detail: { value: string | number } }) { changeDate(savedDates.value[Number(event.detail.value)]) }
@@ -87,8 +87,9 @@ function saveEdit(grams: number) {
   if (saved && safely(() => journal.updateEntry(saved.date, saved.entry.id, grams), '分量已更新')) editing.value = null
 }
 function deleteSelected() {
-  const ids = [...selectedIds.value], date = journal.selectedDate, revision = journal.revision
-  uni.showModal({ title: '删除饮食记录', content: '删除选中的 '+ids.length+' 条记录？摄入将重新汇总，关联计划变为待吃。本页可撤销。', confirmText: '删除', confirmColor: '#ac513b', success: result => {
+  const selection = selectedEntries.value, ids = [...selection.ids], date = journal.selectedDate, revision = journal.revision
+  if (!ids.length) return
+  uni.showModal({ title: '删除选中的已吃项？', content: '删除 '+selection.count+' 项已吃中的 '+selection.details+' 条实际食材明细？将扣除约 '+Math.round(selection.kcal)+' 千卡摄入，仍存在的关联计划变为待吃。本页可撤销。', confirmText: '删除', confirmColor: '#ac513b', success: result => {
     if (!result.confirm) return
     if (date !== journal.selectedDate || revision !== journal.revision) { uni.showToast({ title: '数据已变化，请重新选择', icon: 'none' }); return }
     if (safely(() => journal.deleteEntries(date,ids), '记录已删除')) { selectedIds.value = []; manageMode.value = false }
@@ -109,5 +110,6 @@ function deleteSelected() {
 @media(max-width:350px) { .record-page { padding:18px 16px 28px; }.entry-row { gap:8px; }.entry-icon { width:36px; height:36px; }.entry-name { font-size:14px; }.entry-kcal { font-size:14px; }.section-card { padding-left:12px; padding-right:12px; }.journal-toolbar { gap:8px; }.add-panel { padding:12px; } }
 
 .date-bar>button { flex-shrink:0; }.date-bar picker { flex:1; min-width:0; }.date-value { white-space:nowrap; gap:6px; }.date-label,.date-caret { flex-shrink:0; white-space:nowrap; }.date-label { font-variant-numeric:tabular-nums; }
+.section-card { background:transparent; border:0; padding:0; }.entry-selection { display:flex; align-items:center; justify-content:space-between; gap:8px; }.delete-button { width:100%; min-height:48px; line-height:48px; }.empty-state { background:var(--surface); border:1px solid var(--line); border-radius:18px; }
 @media(max-width:350px) { .date-bar { gap:4px; }.date-value { gap:4px; font-size:13px; } }
 </style>

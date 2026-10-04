@@ -15,15 +15,16 @@ export interface PlanGroup {
 
 // Existing recipe IDs encode the individual addition, not just the recipe name.
 // Unknown legacy IDs remain separate so repeated portions are never guessed.
+export function recipePortionId(id: string): string | undefined { return /^(grp_\d+(?:_[a-z0-9]+)?)_\d+$/.exec(id)?.[1] }
 export function groupPlans(plans: PlanItem[], entries: MealEntry[] = []): PlanGroup[] {
   const linked = new Set(entries.map(entry => entry.planItemId).filter(Boolean))
   const groups = new Map<string, PlanGroup>()
   for (const item of plans) {
-    const match = item.groupName && /^(grp_\d+(?:_[a-z0-9]+)?)_\d+$/.exec(item.id)
-    const id = match ? JSON.stringify([match[1], item.groupName]) : item.id
+    const portion = item.groupName && recipePortionId(item.id)
+    const id = portion ? JSON.stringify([portion, item.groupName]) : item.id
     let group = groups.get(id)
     if (!group) {
-      group = { id, name: match ? item.groupName! : item.foodName, recipe: !!match, items: [], pendingIds: [], eatenIds: [], kcal: 0, pendingKcal: 0, state: 'pending' }
+      group = { id, name: portion ? item.groupName! : item.foodName, recipe: !!portion, items: [], pendingIds: [], eatenIds: [], kcal: 0, pendingKcal: 0, state: 'pending' }
       groups.set(id, group)
     }
     const kcal = planCalories(item)

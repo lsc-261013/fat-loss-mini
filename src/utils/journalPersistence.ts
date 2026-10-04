@@ -2,6 +2,8 @@ import { emptyDay, emptyJournal, type JournalData } from '@/types/journal'
 import { localDate, validDate } from './input'
 import { validateJournal } from './journalValidation'
 import { nextCustomFoodId } from './customFoods'
+import { dayPortionIds } from './entryGroups'
+import { recipePortionId } from './planGroups'
 
 export const JOURNAL_KEY = 'journal-v2'
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -99,9 +101,10 @@ export function mergeBackup(local: JournalData, incoming: JournalData): JournalD
     // A linked plan and record are one unit when IDs conflict.
     const localPlanIds = new Set(target.plans.map(p => p.id))
     const localEntryIds = new Set(target.entries.map(e => e.id))
+    const localPortions = dayPortionIds(target)
     const blockedPlans = new Set(source.entries.filter(e => localEntryIds.has(e.id) && e.planItemId).map(e => e.planItemId))
-    target.plans.push(...clone(source.plans.filter(p => !localPlanIds.has(p.id) && !blockedPlans.has(p.id))))
-    target.entries.push(...clone(source.entries.filter(e => !localEntryIds.has(e.id) && (!e.planItemId || (!localPlanIds.has(e.planItemId) && !blockedPlans.has(e.planItemId))))))
+    target.plans.push(...clone(source.plans.filter(p => !localPlanIds.has(p.id) && !blockedPlans.has(p.id) && !(p.groupName && localPortions.has(recipePortionId(p.id) || '')))))
+    target.entries.push(...clone(source.entries.filter(e => !localEntryIds.has(e.id) && !localPortions.has(e.dish?.id || (e.planItemId ? recipePortionId(e.planItemId) || '' : '')) && (!e.planItemId || (!localPlanIds.has(e.planItemId) && !blockedPlans.has(e.planItemId))))))
   }
   next.customRecipes.push(...clone(sourceData.customRecipes.filter(r => !next.customRecipes.some(existing => existing.id === r.id))))
   validateJournal(next)

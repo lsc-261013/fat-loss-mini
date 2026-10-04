@@ -8,6 +8,7 @@ import { createEntry, foodPortion, newId, calculatedRecipe } from '@/utils/nutri
 import foods from '@/static/foods.json'
 import { createCustomFood, type CustomFoodInput } from '@/utils/customFoods'
 import type { Recipe } from '@/data/recipes'
+import { captureEntryDishes } from '@/utils/entryGroups'
 
 export const useJournalStore = defineStore('journal', () => {
   const data = ref<JournalData>(emptyJournal(localDate()))
@@ -110,6 +111,7 @@ export const useJournalStore = defineStore('journal', () => {
     changeDay(date, day => {
       if (planItemId && day.entries.some(e => e.planItemId === planItemId)) throw new Error('这项计划已经记过了')
       day.entries.push(entry)
+      captureEntryDishes(day)
       if (planItemId) day.plans.forEach(p => { if (p.id === planItemId) p.eaten = true })
     }); return entry
   }
@@ -134,7 +136,7 @@ export const useJournalStore = defineStore('journal', () => {
   function planAction(date: string, ids: string[], action: 'eat' | 'revoke' | 'remove') {
     changeDay(date, day => {
       const selected = day.plans.filter(p => ids.includes(p.id))
-      if (action === 'remove') { day.plans = day.plans.filter(p => !ids.includes(p.id)); return }
+      if (action === 'remove') { captureEntryDishes(day); day.plans = day.plans.filter(p => !ids.includes(p.id)); return }
       for (const plan of selected) {
         const linked = day.entries.filter(e => e.planItemId === plan.id)
         if (action === 'eat') {
@@ -147,6 +149,7 @@ export const useJournalStore = defineStore('journal', () => {
           day.entries = day.entries.filter(e => e.planItemId !== plan.id); plan.eaten = false
         }
       }
+      captureEntryDishes(day)
     }, { eat: '已记入已吃', revoke: '已撤回已吃', remove: '已移除计划' }[action])
   }
   function updateProfile(patch: Partial<UserProfile>) {

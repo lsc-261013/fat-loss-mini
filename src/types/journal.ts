@@ -3,9 +3,10 @@ import type { MacroResult } from '@/utils/calculator'
 
 export interface FoodItem { id: number; name: string; category: string; kcal: number; carbs: number | null; protein: number | null; fat: number | null; customKey?: string; portionGrams?: number }
 export interface CustomFood extends FoodItem { customKey: string; portionGrams: number }
+export interface EntryDish { id: string; name: string; recipeId?: string }
 export interface MealEntry {
   id: string; food: FoodItem; grams: number; subtotalKcal: number; subtotalCarbs: number | null
-  subtotalProtein: number | null; subtotalFat: number | null; createdAt: number; planItemId?: string
+  subtotalProtein: number | null; subtotalFat: number | null; createdAt: number; planItemId?: string; dish?: EntryDish
 }
 export interface PlanItem {
   id: string; foodId: number; foodName: string; grams: number; category: string; kcal: number; eaten: boolean

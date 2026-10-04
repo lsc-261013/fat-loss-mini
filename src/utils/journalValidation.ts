@@ -3,6 +3,7 @@ import { validDate, validGrams } from './input'
 import foods from '@/static/foods.json'
 import { foodCategories } from './customFoods'
 import { validRecipePhoto, MAX_RECIPE_PHOTO_CHARS, RecipePhotoLimitError } from './recipePhotoData'
+import { recipePortionId } from './planGroups'
 
 function ensure(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message) }
 function object(value: unknown): asserts value is Record<string, unknown> { ensure(value && typeof value === 'object' && !Array.isArray(value), '备份结构不完整') }
@@ -55,6 +56,11 @@ export function validateJournal(value: unknown): asserts value is JournalData {
         ensure((entry[subtotal] === null) === (entry.food[key] === null), '记录营养缺失状态不一致')
       }
       if (entry.planItemId !== undefined) text(entry.planItemId)
+      if (entry.dish !== undefined) {
+        object(entry.dish); text(entry.dish.id); text(entry.dish.name)
+        ensure(typeof entry.planItemId === 'string' && recipePortionId(entry.planItemId) === entry.dish.id, '记录菜份关联无效')
+        if (entry.dish.recipeId !== undefined) text(entry.dish.recipeId)
+      }
     }
     for (const plan of day.plans) {
       object(plan); number(plan.foodId, 1); text(plan.foodName); text(plan.category)

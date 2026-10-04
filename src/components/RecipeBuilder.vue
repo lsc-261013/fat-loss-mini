@@ -1,7 +1,7 @@
 <template>
   <view class="builder-overlay" @tap="close">
     <view class="builder-panel" @tap.stop>
-      <view class="builder-header"><text class="builder-title">{{ recipe ? '编辑菜谱' : '自建菜谱' }}</text><button @tap="close" aria-label="关闭自建菜谱"><AppIcon name="close"/></button></view>
+      <view class="builder-header"><text class="builder-title">{{ recipe ? '编辑菜谱' : seed ? '另存我的搭配' : '自建菜谱' }}</text><button @tap="close" aria-label="关闭自建菜谱"><AppIcon name="close"/></button></view>
       <scroll-view class="builder-body" scroll-y>
         <view class="builder-content">
           <text class="field-label">菜谱名称</text>
@@ -35,7 +35,7 @@
           <text v-if="!validGrams(grams)" class="error">克数须大于 0 且不超过 5000</text>
         </view>
         <text v-if="saveError" class="error save-error" role="alert">{{ saveError }}</text>
-        <view class="save-row"><view class="save-summary"><text>{{ items.length }} 种食材</text><text class="muted">合计约 {{ Math.round(total) }} 千卡</text></view><button class="save-button" :disabled="photoBusy" @tap="save">{{ recipe ? '保存修改' : '保存菜谱' }}</button></view>
+        <view class="save-row"><view class="save-summary"><text>{{ items.length }} 种食材</text><text class="muted">合计约 {{ Math.round(total) }} 千卡</text></view><button class="save-button" :disabled="photoBusy" @tap="save">{{ recipe ? '保存修改' : seed ? '保存搭配' : '保存菜谱' }}</button></view>
       </view>
     </view>
   </view>
@@ -56,7 +56,7 @@ import { chooseRecipePhoto } from '@/utils/recipePhotos'
 import { initialRecipeMeal, recipeMeals } from '@/utils/recipeMeals'
 import { recipePhotoChars, MAX_RECIPE_PHOTO_CHARS, RecipePhotoLimitError } from '@/utils/recipePhotoData'
 
-const props = defineProps<{ recipe?: Recipe | null; mealFilter?: string }>()
+const props = defineProps<{ recipe?: Recipe | null; seed?: Recipe | null; mealFilter?: string }>()
 const emit = defineEmits<{ close: []; saved: [recipe: Recipe]; managePhotos: [] }>()
 // #ifdef H5
 let previousOverflow = ''
@@ -65,10 +65,11 @@ onUnmounted(() => { document.body.style.overflow = previousOverflow })
 // #endif
 const journal = useJournalStore()
 const foods = computed(() => journal.allFoods)
-const name = ref(props.recipe?.name || '')
-const mealTime = ref(initialRecipeMeal(props.recipe, props.mealFilter))
-const items = ref<Recipe['ingredients']>((props.recipe?.ingredients || []).map(item => ({ ...item })))
-const photo = ref(props.recipe?.photo || '')
+const initial = props.recipe || props.seed
+const name = ref(props.recipe?.name || (props.seed ? props.seed.name + '（我的搭配）' : ''))
+const mealTime = ref(initialRecipeMeal(initial, props.mealFilter))
+const items = ref<Recipe['ingredients']>((initial?.ingredients || []).map(item => ({ ...item })))
+const photo = ref(initial?.photo || '')
 const photoBusy = ref(false), photoError = ref(''), saveError = ref('')
 const photoQuotaError = ref(false)
 let alive = true
@@ -128,9 +129,9 @@ function save() {
   saveError.value = ''; photoQuotaError.value = false
   if (selectedFood.value) { uni.showToast({ title: '请先确认当前食材，或取消选择', icon: 'none' }); return }
   if (!name.value.trim() || !items.value.length) { uni.showToast({ title: '请填写菜名并添加食材', icon: 'none' }); return }
-  const previousDescription = props.recipe?.description
+  const previousDescription = initial?.description
   const description = previousDescription && !/^\d+种食材$/.test(previousDescription) ? previousDescription : `${items.value.length}种食材`
-  const recipe: Recipe = { ...props.recipe, id: props.recipe?.id || 'custom_' + newId(), name: name.value.trim(), type: props.recipe?.type || 'standard', mealTime: mealTime.value, ingredients: items.value.map(item => ({ ...item })), ...recipeNutrition(items.value, foods.value), description }
+  const recipe: Recipe = { ...props.recipe, id: props.recipe?.id || 'custom_' + newId(), name: name.value.trim(), type: initial?.type || 'standard', mealTime: mealTime.value, ingredients: items.value.map(item => ({ ...item })), ...recipeNutrition(items.value, foods.value), description }
   if (photo.value) recipe.photo = photo.value
   else delete recipe.photo
   try { journal.saveCustomRecipe(recipe, props.recipe?.id) }

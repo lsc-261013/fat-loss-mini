@@ -47,3 +47,15 @@
 | [plans-confirmed-r10-390.png](plans-confirmed-r10-390.png) | 全部确认后提示、摄入628及撤回入口；../r10-interaction-2026-10-04/plans-all-confirmed-final-390.png |
 
 320px长名称/空态、桌面、草稿返回和容量证据仅留本机。[R10交接](../../ROUND10-INTERACTION-HANDOFF.md)。未把过程备份JSON或动画初帧截图提交。
+
+## R11现有管理与已吃菜份
+
+2026-10-05，独立127.0.0.1:5196真实H5页面，AI合成数据，非微信截图，未导入或清理5192来源。照片为项目既有示意图，不是用户真实照片；不同截图取自不同操作时点。
+
+| 文件 | 内容与本机来源 |
+| --- | --- |
+| [intake-groups-r11-390.png](intake-groups-r11-390.png) | 已吃3项、原始7条/856.6千卡，两份同菜不合并，单香蕉独立；../r11-groups-2026-10-05/intake-two-servings-390.png |
+| [existing-batch-r11-390.png](existing-batch-r11-390.png) | 内置/自建混合选择隐藏2、删除自建1，固定操作区；../r11-groups-2026-10-05/existing-mixed-390.png |
+| [intake-long-r11-320.png](intake-long-r11-320.png) | 缺图长名称、五配料展开、末项修改与撤销；../r11-groups-2026-10-05/intake-long-320.png |
+
+管理空态/长名、桌面、原草稿返回、源删除回退截图及容量/合并字段核对仅留本机。[R11交接](../../ROUND11-EXISTING-INTAKE-HANDOFF.md)。照片容量草稿只验证链路，不代表其配料摄影；未提交合成备份、缓存或日志。
