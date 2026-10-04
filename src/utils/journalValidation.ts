@@ -2,7 +2,7 @@ import type { JournalData } from '@/types/journal'
 import { validDate, validGrams } from './input'
 import foods from '@/static/foods.json'
 import { foodCategories } from './customFoods'
-import { validRecipePhoto, MAX_RECIPE_PHOTO_CHARS } from './recipePhotoData'
+import { validRecipePhoto, MAX_RECIPE_PHOTO_CHARS, RecipePhotoLimitError } from './recipePhotoData'
 
 function ensure(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message) }
 function object(value: unknown): asserts value is Record<string, unknown> { ensure(value && typeof value === 'object' && !Array.isArray(value), '备份结构不完整') }
@@ -89,5 +89,5 @@ export function validateJournal(value: unknown): asserts value is JournalData {
     number(recipe.totalKcal)
     for (const key of ['totalCarbs', 'totalProtein', 'totalFat']) nullableNumber(recipe[key])
   }
-  ensure(photoChars <= MAX_RECIPE_PHOTO_CHARS, '菜谱照片占用空间较多，请移除一些照片后重试；文字和饮食记录仍会保留')
+  if (photoChars > MAX_RECIPE_PHOTO_CHARS) throw new RecipePhotoLimitError()
 }

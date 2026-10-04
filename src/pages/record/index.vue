@@ -2,7 +2,7 @@
   <view class="record-page">
     <view class="record-heading"><text class="page-title">饮食记录</text><text class="page-subtitle">计划与实际，分开记清楚</text></view>
     <view v-if="journal.error" class="error-banner"><text>数据未就绪：{{ journal.error }}。原数据保留，请勿清理缓存。</text><button @tap="journal.refresh()">重试读取</button></view>
-    <view class="date-bar"><button aria-label="前一天" @tap="changeDate(shiftDate(journal.selectedDate,-1))">‹</button><picker mode="date" :value="journal.selectedDate" :end="journal.today" start="1900-01-01" @change="onDatePick"><view class="date-value"><AppIcon name="calendar" :size="17"/>{{ journal.selectedDate }} {{ isToday ? '· 今天' : '' }} ▾</view></picker><button aria-label="后一天" :disabled="isToday" @tap="changeDate(shiftDate(journal.selectedDate,1))">›</button></view>
+    <view class="date-bar"><button aria-label="前一天" @tap="changeDate(shiftDate(journal.selectedDate,-1))">‹</button><picker mode="date" :value="journal.selectedDate" :end="journal.today" start="1900-01-01" @change="onDatePick"><view class="date-value"><AppIcon name="calendar" :size="17"/><text class="date-label">{{ journal.selectedDate }}{{ isToday ? ' · 今天' : '' }}</text><text class="date-caret">▾</text></view></picker><button aria-label="后一天" :disabled="isToday" @tap="changeDate(shiftDate(journal.selectedDate,1))">›</button></view>
     <view class="date-tools"><picker v-if="savedDates.length" :range="savedDates" @change="onSavedPick"><view class="target-link">历史记录 ({{ savedDates.length }}) ▾</view></picker><button v-if="!isToday" class="text-button" @tap="changeDate(journal.today)">回到今天</button></view>
     <view v-if="!isToday" class="history-banner">{{ journal.selectedDate }} 的记录，可在此补记{{ day.target ? '。目标沿用当天值。' : '。未保存当日目标。' }}</view>
     <CalorieCard compact :label="isToday ? '今天已记录' : '当日已记录'" :target="day.target?.targetCalories" :consumed="total.kcal" :macros="macroPayload" />
@@ -108,4 +108,6 @@ function deleteSelected() {
 .check { width:20px; height:20px; border:1px solid #8d9b85; border-radius:6px; flex-shrink:0; text-align:center; font-size:13px; }.check.checked { color:#fff; background:var(--brand); border-color:var(--brand); }.delete-button { background:#faeee6; color:#9e543f; margin-top:16px; font-size:14px; border-radius:12px; }.undo-row { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; background:#eaf0e0; border:1px solid #dce4d3; border-radius:12px; padding:8px 14px; margin-top:16px; animation:content-in .2s ease; }.local-note { font-size:11px; }
 @media(max-width:350px) { .record-page { padding:18px 16px 28px; }.entry-row { gap:8px; }.entry-icon { width:36px; height:36px; }.entry-name { font-size:14px; }.entry-kcal { font-size:14px; }.section-card { padding-left:12px; padding-right:12px; }.journal-toolbar { gap:8px; }.add-panel { padding:12px; } }
 
+.date-bar>button { flex-shrink:0; }.date-bar picker { flex:1; min-width:0; }.date-value { white-space:nowrap; gap:6px; }.date-label,.date-caret { flex-shrink:0; white-space:nowrap; }.date-label { font-variant-numeric:tabular-nums; }
+@media(max-width:350px) { .date-bar { gap:4px; }.date-value { gap:4px; font-size:13px; } }
 </style>

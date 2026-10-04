@@ -6,11 +6,14 @@
         <view class="builder-content">
           <text class="field-label">菜谱名称</text>
           <input class="name-input" v-model="name" maxlength="50" placeholder="例如：鸡胸肉杂粮饭" aria-label="菜谱名称" />
+          <text class="field-label">餐次</text>
+          <view class="recipe-meals" role="group" aria-label="菜谱餐次"><button v-for="meal in recipeMeals" :key="meal.key" :class="{ active: mealTime === meal.key }" :aria-pressed="mealTime === meal.key" @tap="mealTime = meal.key">{{ meal.label }}</button></view>
           <view class="photo-field">
             <view class="photo-preview"><FoodVisual :src="photo" :label="name || '自建菜谱'" /></view>
             <view class="photo-copy"><text class="field-label">菜谱照片 <text class="muted">选填</text></text><text class="photo-hint">{{ photo ? '照片随菜谱保存，也会包含在备份中。' : '放一张自己的成品照，更容易找到这道菜。' }}</text><view class="photo-actions"><button :disabled="photoBusy" @tap="choosePhoto">{{ photoBusy ? '正在处理照片…' : photo ? '更换照片' : '添加照片' }}</button><button v-if="photo" class="remove-photo" :disabled="photoBusy" @tap="photo = ''; photoError = ''">移除</button></view></view>
           </view>
           <text v-if="photoError" class="error" role="alert">{{ photoError }}</text>
+          <view v-if="photoLimitReached" class="photo-limit" role="alert"><text>照片空间不足，隐藏菜谱的照片也计入占用。可以先清理，当前编辑会保留。</text><button @tap="emit('managePhotos')">管理隐藏菜谱 · 清理照片 ›</button></view>
           <text v-if="recipe" class="edit-note">修改只影响这份菜谱，已加入的计划和饮食记录保持原样。</text>
           <view class="section-heading"><text class="field-label">已选食材 <text class="muted">{{ items.length }}</text></text><text class="muted">约 {{ Math.round(total) }} 千卡</text></view>
           <text v-if="hasUnknownMacros" class="muted">部分食材营养数据未完善，热量仍可计算。</text>
@@ -39,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import FoodVisual from './FoodVisual.vue'
 import AppIcon from './AppIcon.vue'
 import { foodCategories } from '@/utils/customFoods'
@@ -50,9 +53,11 @@ import { foodPortion, newId, recipeNutrition } from '@/utils/nutrition'
 import { validGrams } from '@/utils/input'
 import { defaultRecipeGrams, portionStep } from '@/utils/foodPortions'
 import { chooseRecipePhoto } from '@/utils/recipePhotos'
+import { initialRecipeMeal, recipeMeals } from '@/utils/recipeMeals'
+import { recipePhotoChars, MAX_RECIPE_PHOTO_CHARS, RecipePhotoLimitError } from '@/utils/recipePhotoData'
 
-const props = defineProps<{ recipe?: Recipe | null }>()
-const emit = defineEmits<{ close: []; saved: [recipe: Recipe] }>()
+const props = defineProps<{ recipe?: Recipe | null; mealFilter?: string }>()
+const emit = defineEmits<{ close: []; saved: [recipe: Recipe]; managePhotos: [] }>()
 // #ifdef H5
 let previousOverflow = ''
 onMounted(() => { previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden' })
@@ -61,13 +66,19 @@ onUnmounted(() => { document.body.style.overflow = previousOverflow })
 const journal = useJournalStore()
 const foods = computed(() => journal.allFoods)
 const name = ref(props.recipe?.name || '')
+const mealTime = ref(initialRecipeMeal(props.recipe, props.mealFilter))
 const items = ref<Recipe['ingredients']>((props.recipe?.ingredients || []).map(item => ({ ...item })))
 const photo = ref(props.recipe?.photo || '')
 const photoBusy = ref(false), photoError = ref(''), saveError = ref('')
+const photoQuotaError = ref(false)
 let alive = true
 onUnmounted(() => { alive = false })
-const original = JSON.stringify({ name: name.value, items: items.value, photo: photo.value })
-const changed = computed(() => original !== JSON.stringify({ name: name.value, items: items.value, photo: photo.value }))
+const original = JSON.stringify({ name: name.value, mealTime: mealTime.value, items: items.value, photo: photo.value })
+const changed = computed(() => original !== JSON.stringify({ name: name.value, mealTime: mealTime.value, items: items.value, photo: photo.value }))
+const photoLimitReached = computed(() => recipePhotoChars(journal.data.customRecipes.filter(recipe => recipe.id !== props.recipe?.id)) + photo.value.length > MAX_RECIPE_PHOTO_CHARS)
+watch(photoLimitReached, reached => {
+  if (!reached && photoQuotaError.value) { saveError.value = ''; photoQuotaError.value = false }
+})
 const selectedFood = ref<FoodItem | null>(null)
 const editingIndex = ref<number | null>(null)
 const grams = ref<number | string>(100)
@@ -114,16 +125,16 @@ async function choosePhoto() {
 }
 function save() {
   if (photoBusy.value) return
-  saveError.value = ''
+  saveError.value = ''; photoQuotaError.value = false
   if (selectedFood.value) { uni.showToast({ title: '请先确认当前食材，或取消选择', icon: 'none' }); return }
   if (!name.value.trim() || !items.value.length) { uni.showToast({ title: '请填写菜名并添加食材', icon: 'none' }); return }
   const previousDescription = props.recipe?.description
   const description = previousDescription && !/^\d+种食材$/.test(previousDescription) ? previousDescription : `${items.value.length}种食材`
-  const recipe: Recipe = { ...props.recipe, id: props.recipe?.id || 'custom_' + newId(), name: name.value.trim(), type: props.recipe?.type || 'standard', mealTime: props.recipe?.mealTime || 'lunch', ingredients: items.value.map(item => ({ ...item })), ...recipeNutrition(items.value, foods.value), description }
+  const recipe: Recipe = { ...props.recipe, id: props.recipe?.id || 'custom_' + newId(), name: name.value.trim(), type: props.recipe?.type || 'standard', mealTime: mealTime.value, ingredients: items.value.map(item => ({ ...item })), ...recipeNutrition(items.value, foods.value), description }
   if (photo.value) recipe.photo = photo.value
   else delete recipe.photo
   try { journal.saveCustomRecipe(recipe, props.recipe?.id) }
-  catch (error) { saveError.value = error instanceof Error && !(error instanceof TypeError) ? error.message : '食谱未保存，请重试；填写内容已保留'; return }
+  catch (error) { photoQuotaError.value = error instanceof RecipePhotoLimitError; saveError.value = error instanceof Error && !(error instanceof TypeError) ? error.message : '食谱未保存，请重试；填写内容已保留'; return }
   emit('saved', recipe); emit('close'); uni.showToast({ title: props.recipe ? '菜谱已更新' : '菜谱已保存', icon: 'success' })
 }
 </script>
@@ -148,5 +159,6 @@ button { margin:0; padding:0 12rpx; min-height:44px; line-height:44px; font-size
 @media(max-width:350px) { .builder-content { padding:16px; }.builder-footer { padding-left:16px; padding-right:16px; }.food-option { padding:12px; }.portion-controls { gap:6px; }.portion-controls .portion-add { padding:0 12px; }.category-tabs button { padding:0 10px; } }
 .photo-field { display:flex; gap:14px; align-items:center; margin-bottom:20px; padding:12px; background:var(--wash); border-radius:14px; }.photo-preview { width:90px; height:90px; flex-shrink:0; overflow:hidden; border-radius:12px; }.photo-copy { flex:1; min-width:0; }.photo-hint { display:block; font-size:12px; color:var(--muted); line-height:1.6; margin-top:4px; }.photo-actions { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-top:2px; }.photo-actions button { padding:0 8px; font-size:13px; }.photo-actions .remove-photo { color:#9e543f; }.portion-note { display:block; font-size:11px; line-height:1.6; color:var(--muted); margin-top:8px; }.save-error { margin-bottom:12px; line-height:1.6; }button[disabled] { opacity:.5; }
 .edit-note { display:block; font-size:12px; line-height:1.7; color:var(--muted); margin-bottom:20px; }
+.recipe-meals { display:flex; gap:6px; margin:10px 0 22px; }.recipe-meals button { flex:1; min-width:0; padding:0 4px; background:var(--wash); color:var(--muted); border-radius:12px; font-size:13px; }.recipe-meals .active { background:var(--brand); color:#fff; }.photo-limit { padding:12px; margin-bottom:16px; border-radius:12px; background:#fbede6; font-size:12px; color:#934c36; line-height:1.7; }.photo-limit text { display:block; }.photo-limit button { padding:0; font-size:12px; text-align:left; line-height:1.7; white-space:normal; }
 @media(max-width:350px) { .photo-field { padding:10px; gap:10px; }.photo-preview { width:72px; height:80px; } }
 </style>

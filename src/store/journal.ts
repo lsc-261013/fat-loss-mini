@@ -66,6 +66,20 @@ export const useJournalStore = defineStore('journal', () => {
       }
     })
   }
+  function hideRecipes(ids: string[]) {
+    mutate(next => { next.hiddenRecipeIds = [...new Set([...next.hiddenRecipeIds, ...ids])] })
+  }
+  function restoreRecipes(ids: string[]) {
+    mutate(next => { next.hiddenRecipeIds = next.hiddenRecipeIds.filter(id => !ids.includes(id)) })
+  }
+  function removeRecipePhoto(id: string) {
+    mutate(next => {
+      const recipe = next.customRecipes.find(item => item.id === id)
+      if (!recipe) throw new Error('这份菜谱已变化，请重新打开隐藏菜谱')
+      // Only the presentation field changes; recipe and day snapshots stay intact.
+      delete recipe.photo
+    })
+  }
   function changeDay(date: string, action: (day: JournalDay) => void, label?: string) {
     ensureLoaded()
     if (!validDate(date) || date > localDate()) throw new Error('记录日期无效')
@@ -150,5 +164,5 @@ export const useJournalStore = defineStore('journal', () => {
     uni.removeStorageSync('journal-before-import-v2')
   }
   function recoveryBackup() { return uni.getStorageSync('journal-before-import-v2') as string }
-  return { data, allFoods, addCustomFood, saveCustomRecipe, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
+  return { data, allFoods, addCustomFood, saveCustomRecipe, hideRecipes, restoreRecipes, removeRecipePhoto, today, selectedDate, error, loaded, revision, currentDay, todayDay, undo, refresh, ensureLoaded, selectDate, mutate, changeDay, undoDay, addEntry, updateEntry, deleteEntries, addPlan, planAction, updateProfile, importData, canUndoImport, undoImport, recoveryBackup }
 })

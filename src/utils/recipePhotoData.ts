@@ -2,6 +2,18 @@ export const MAX_PHOTO_BYTES = 36 * 1024
 export const MAX_PHOTO_CHARS = 4 * Math.ceil(MAX_PHOTO_BYTES / 3) + 23
 export const MAX_RECIPE_PHOTO_CHARS = 512 * 1024
 
+// ASCII data URLs occupy one encoded byte per character in the photo budget.
+export function recipePhotoChars(recipes: readonly { photo?: string }[]): number {
+  return recipes.reduce((total, recipe) => total + (recipe.photo?.length || 0), 0)
+}
+
+export class RecipePhotoLimitError extends Error {
+  constructor() {
+    super('菜谱照片空间不足，请到「隐藏菜谱」清理照片，或移除其他菜谱照片后重试；原数据和草稿保留')
+    this.name = 'RecipePhotoLimitError'
+  }
+}
+
 // Only self-contained raster photos are accepted; temporary paths and remote URLs expire.
 export function validRecipePhoto(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > MAX_PHOTO_CHARS) return false

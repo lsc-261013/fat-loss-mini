@@ -1,20 +1,21 @@
 <template>
-  <page-meta :page-style="showRecipeBuilder || detailRecipe || swapping ? 'overflow: hidden;' : ''" />
+  <page-meta :page-style="showRecipeBuilder || detailRecipe || swapping || showHiddenRecipes ? 'overflow: hidden;' : ''" />
   <view class="recipe-page">
     <view class="page-heading"><view><text class="page-eyebrow">选一道，安排下一餐</text><text class="page-title">日常食谱</text></view><button class="create-button" @tap="openBuilder()"><AppIcon name="plus" :size="17"/>自建</button></view>
     <view v-if="userStore.nutritionTarget" class="gap-card"><text>今天{{ remainingKcal >= 0 ? '距参考目标还差' : '高于参考目标' }}</text><text class="gap-number">{{ Math.abs(remainingKcal) }} <text>千卡</text></text><text v-if="remainingCarbs === null || remainingProtein === null" class="gap-note">部分营养未完善</text></view>
     <view v-if="todayPlanCount && !lastAdded" class="plan-shortcut"><AppIcon name="book"/><view><text class="plan-shortcut-title">今天已安排 {{ todayPlanCount }} 项</text><text class="recipe-hint">{{ planStore.plannedTotal.count }} 项待吃 · 吃过再确认</text></view><button @tap="journalNavigation.openToday('plan')">查看计划 ›</button></view>
     <view v-if="lastAdded" :key="lastAddedId + todayPlanCount" class="added-receipt content-enter" role="status"><view class="success-icon"><AppIcon name="check" /></view><view class="receipt-copy"><text>已加入：{{ lastAdded }}</text><text class="recipe-hint">已保存到今天计划，尚未计入摄入</text></view><button @tap="journalNavigation.openToday('plan')">去计划 ›</button></view>
     <view class="filter-row"><view class="meal-filters"><button v-for="filter in mealFilters" :key="filter.key" :class="{active: mealFilter === filter.key}" @tap="mealFilter = filter.key; selectedIds = []">{{ filter.label }}</button></view><button class="manage-button" @tap="manageMode = !manageMode; selectedIds = []">{{ manageMode ? '完成' : '管理' }}</button></view>
+    <view v-if="manageMode" class="hidden-entry"><button @tap="showHiddenRecipes = true">隐藏菜谱 ({{ hiddenRecipeIds.size }}) · 恢复 / 清理照片 ›</button><text class="recipe-hint">隐藏不释放照片空间；移除照片保留菜谱和历史记录。</text></view>
     <view class="recipe-grid">
       <view v-for="r in visibleRecipes" :key="r.id" class="meal-card surface-panel" :class="{selected:manageMode && selectedIds.includes(r.id)}">
-        <view class="recipe-photo" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><FoodVisual :src="recipeImage(r)" :label="r.name" :caption="recipeImage(r) ? '' : '我的搭配'"/><text class="meal-time-tag">{{ customRecipeIds.has(r.id) ? '自建菜谱' : mealTimeLabel(r.mealTime) }}</text><view v-if="manageMode" class="manage-check" :class="{checked:selectedIds.includes(r.id)}">{{ selectedIds.includes(r.id) ? '✓' : '' }}</view></view>
-        <view class="meal-body"><view class="meal-title-row" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><text class="meal-name">{{ displayDishName(r.name) }}</text><text class="meal-kcal">{{ Math.round(r.totalKcal) }}<text> 千卡</text></text></view><text class="meal-ingredients">{{ getIngredientLabels(r).map(ing => ing.name).join(' · ') }}</text><view class="meal-footer"><view class="meal-links"><button class="detail-link" @tap="openDetail(r)">配料与分量 ›</button><button v-if="!manageMode && customRecipeIds.has(r.id)" class="edit-link" :aria-label="'编辑菜谱' + r.name" @tap="openBuilder(r)">编辑</button></view><button v-if="!manageMode" class="meal-add-plan" :class="{added: lastAddedId === r.id}" @tap="addRecipeToPlan(r)"><AppIcon :name="lastAddedId === r.id ? 'check' : 'plus'" :size="16"/>{{ lastAddedId === r.id ? '再加一份' : '加入计划' }}</button><button v-else class="meal-del-one" @tap="deleteOneRecipe(r.id)">删除</button></view></view>
+        <view class="recipe-photo" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><FoodVisual :src="recipeImage(r)" :label="r.name" :caption="recipeImage(r) ? '' : '我的搭配'"/><text class="meal-time-tag">{{ customRecipeIds.has(r.id) ? '自建 · ' + mealTimeLabel(r.mealTime) : mealTimeLabel(r.mealTime) }}</text><view v-if="manageMode" class="manage-check" :class="{checked:selectedIds.includes(r.id)}">{{ selectedIds.includes(r.id) ? '✓' : '' }}</view></view>
+        <view class="meal-body"><view class="meal-title-row" @tap="manageMode ? toggleSelect(r.id) : openDetail(r)"><text class="meal-name">{{ displayDishName(r.name) }}</text><text class="meal-kcal">{{ Math.round(r.totalKcal) }}<text> 千卡</text></text></view><text class="meal-ingredients">{{ getIngredientLabels(r).map(ing => ing.name).join(' · ') }}</text><view class="meal-footer"><view class="meal-links"><button class="detail-link" @tap="openDetail(r)">配料与分量 ›</button><button v-if="!manageMode && customRecipeIds.has(r.id)" class="edit-link" :aria-label="'编辑菜谱' + r.name" @tap="openBuilder(r)">编辑</button></view><button v-if="!manageMode" class="meal-add-plan" :class="{added: lastAddedId === r.id}" @tap="addRecipeToPlan(r)"><AppIcon :name="lastAddedId === r.id ? 'check' : 'plus'" :size="16"/>{{ lastAddedId === r.id ? '再加一份' : '加入计划' }}</button><button v-else class="meal-del-one" @tap="deleteOneRecipe(r.id)">隐藏</button></view></view>
       </view>
     </view>
-    <view v-if="manageMode && selectedIds.length" class="manage-bar"><button class="manage-del-btn" @tap="batchDelete">删除选中 ({{ selectedIds.length }})</button></view>
+    <view v-if="manageMode && selectedIds.length" class="manage-bar"><button class="manage-del-btn" @tap="batchDelete">隐藏选中 ({{ selectedIds.length }})</button></view>
     <view v-if="!visibleRecipes.length" class="empty-card surface-panel"><view class="empty-picture"><FoodVisual /></view><text class="empty-title">{{ allRecipes.length ? '这个分类还没有食谱' : '留一份你的日常搭配' }}</text><text class="recipe-hint">{{ allRecipes.length ? '换个分类看看，或自己创建一份。' : '选择食材与分量，保存自己的菜谱。' }}</text><button class="secondary-action" @tap="openBuilder()">自建菜谱</button></view>
-    <button v-if="deletedRecipes" class="secondary-action" @tap="undoRecipeDelete">撤销最近一次删除</button>
+    <button v-if="deletedRecipes" class="secondary-action" @tap="undoRecipeDelete">撤销最近一次隐藏</button>
     <text class="image-note">食物图片为示意，热量来自配料计算。</text>
     <view v-if="detailRecipe" class="detail-overlay" @tap="detailRecipe = null"><view class="detail-panel content-enter" @tap.stop>
       <view class="detail-heading"><text>食谱详情</text><button aria-label="关闭食谱详情" @tap="detailRecipe = null"><AppIcon name="close"/></button></view><view class="detail-photo"><FoodVisual :src="recipeImage(detailRecipe)" :label="detailRecipe.name"/></view><text class="detail-title">{{ displayDishName(detailRecipe.name) }}</text><text class="detail-kcal">约 {{ Math.round(detailRecipe.totalKcal) }} 千卡 · {{ detailRecipe.ingredients.length }} 种配料</text><button v-if="customRecipeIds.has(detailRecipe.id)" class="detail-edit" @tap="openBuilder(detailRecipe)">编辑菜谱 · 修改配料或照片</button><text class="detail-sub">点击食材可替换；预设食谱会另存为我的搭配。</text><text v-if="detailRecipe.totalCarbs === null || detailRecipe.totalProtein === null || detailRecipe.totalFat === null" class="detail-sub">部分营养数据未完善，热量照常计算。</text>
@@ -55,7 +56,8 @@
     </view>
 
 
-    <RecipeBuilder v-if="showRecipeBuilder" :recipe="editingRecipe" @saved="onRecipeSaved" @close="closeBuilder" />
+    <RecipeBuilder v-if="showRecipeBuilder" :recipe="editingRecipe" :meal-filter="mealFilter" @manage-photos="showHiddenRecipes = true" @saved="onRecipeSaved" @close="closeBuilder" />
+    <HiddenRecipes v-if="showHiddenRecipes" :editing="showRecipeBuilder" @close="showHiddenRecipes = false" @restored="onHiddenRestored" />
   </view>
 </template>
 <script setup lang="ts">
@@ -67,6 +69,8 @@ import { useJournalStore } from '@/store/journal'
 import { calculatedRecipe, foodPortion } from '@/utils/nutrition'
 import { ref, computed } from 'vue'
 import RecipeBuilder from '@/components/RecipeBuilder.vue'
+import HiddenRecipes from '@/components/HiddenRecipes.vue'
+import { recipeMeals, recipeMealLabel } from '@/utils/recipeMeals'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { validGrams } from '@/utils/input'
 import { useUserStore } from '@/store/user'
@@ -95,7 +99,7 @@ const journalNavigation = useJournalNavigation()
 const lastAdded = ref('')
 const lastAddedId = ref('')
 const mealFilter = ref('all')
-const mealFilters = [{key:'all',label:'全部'},{key:'breakfast',label:'早餐'},{key:'lunch',label:'午餐'},{key:'dinner',label:'晚餐'},{key:'snack',label:'加餐'},{key:'custom',label:'自建'}]
+const mealFilters = [{ key: 'all', label: '全部' }, ...recipeMeals, { key: 'custom', label: '自建' }]
 const visibleRecipes = computed(() => allRecipes.value.filter(recipe => mealFilter.value === 'all' || (mealFilter.value === 'custom' ? customRecipeIds.value.has(recipe.id) : recipe.mealTime === mealFilter.value)))
 const todayPlanCount = computed(() => groupPlans(journal.todayDay.plans, journal.todayDay.entries).length)
 const detailRecipe = ref<Recipe | null>(null)
@@ -110,6 +114,7 @@ const swapKcal = computed(() => {
 
 // 管理 + 隐藏食谱
 const manageMode = ref(false)
+const showHiddenRecipes = ref(false)
 const selectedIds = ref<string[]>([])
 const hiddenRecipeIds = computed(() => new Set(journal.data.hiddenRecipeIds))
 
@@ -121,26 +126,27 @@ function toggleSelect(id: string) {
 
 function batchDelete() {
   if (!selectedIds.value.length) return
-  uni.showModal({ title: '删除食谱', content: '删除选中的 ' + selectedIds.value.length + ' 份食谱？本页可撤销最近一次删除。', success: res => { if (res.confirm) deleteRecipes([...selectedIds.value]) } })
+  const ids = [...selectedIds.value]
+  uni.showModal({ title: '隐藏食谱', content: '从列表隐藏选中的 ' + ids.length + ' 份食谱？照片仍占空间，可在「隐藏菜谱」恢复或清理照片，历史计划和已吃不受影响。', confirmText: '隐藏', success: res => { if (res.confirm) deleteRecipes(ids) } })
 }
 const deletedRecipes = ref<string[] | null>(null)
 function deleteRecipes(ids: string[]) {
-  const next = new Set([...hiddenRecipeIds.value, ...ids])
-  try { journal.mutate(data => { data.hiddenRecipeIds = [...next] }) }
-  catch { uni.showToast({ title: '删除未保存，请重试', icon: 'none' }); return }
-  deletedRecipes.value = ids
+  const newlyHidden = ids.filter(id => !hiddenRecipeIds.value.has(id))
+  if (!newlyHidden.length) return
+  try { journal.hideRecipes(newlyHidden) }
+  catch { uni.showToast({ title: '隐藏未保存，请重试', icon: 'none' }); return }
+  deletedRecipes.value = newlyHidden
   selectedIds.value = []
   manageMode.value = false
-  uni.showToast({ title: '已删除', icon: 'success' })
+  uni.showToast({ title: '已隐藏，可恢复', icon: 'success' })
 }
 
 function deleteOneRecipe(id: string) {
-  uni.showModal({ title: '删除食谱', content: '删除后可在本页撤销，已加入的计划不受影响。', success: res => { if (res.confirm) deleteRecipes([id]) } })
+  uni.showModal({ title: '隐藏食谱', content: '只从食谱列表隐藏，照片仍占空间。可在「管理 → 隐藏菜谱」恢复或移除照片；历史计划和饮食记录不受影响。', confirmText: '隐藏', success: res => { if (res.confirm) deleteRecipes([id]) } })
 }
 function undoRecipeDelete() {
   if (!deletedRecipes.value) return
-  const next = [...hiddenRecipeIds.value].filter(id => !deletedRecipes.value!.includes(id))
-  try { journal.mutate(data => { data.hiddenRecipeIds = next }) }
+  try { journal.restoreRecipes(deletedRecipes.value) }
   catch { uni.showToast({ title: '恢复未保存，请重试', icon: 'none' }); return }
   deletedRecipes.value = null
   uni.showToast({ title: '已恢复', icon: 'success' })
@@ -157,8 +163,16 @@ function openBuilder(recipe?: Recipe) {
 }
 function closeBuilder() { showRecipeBuilder.value = false; editingRecipe.value = null }
 function onRecipeSaved(recipe: Recipe) {
-  if (!editingRecipe.value) mealFilter.value = 'custom'
+  if (mealFilter.value !== 'all' && mealFilter.value !== 'custom' && mealFilter.value !== recipe.mealTime) mealFilter.value = recipe.mealTime
+  else if (!editingRecipe.value && mealFilter.value === 'all') mealFilter.value = 'custom'
+  manageMode.value = false; selectedIds.value = []
   if (lastAddedId.value === recipe.id) lastAddedId.value = ''
+}
+function onHiddenRestored(id: string) {
+  selectedIds.value = []
+  if (deletedRecipes.value) deletedRecipes.value = deletedRecipes.value.filter(item => item !== id)
+  if (!deletedRecipes.value?.length) deletedRecipes.value = null
+  if (!showRecipeBuilder.value) mealFilter.value = 'all'
 }
 function loadCustomRecipes() { journal.refresh() }
 onShow(() => { recordsStore.loadToday(); planStore.loadPlan(); lastAdded.value = ''; lastAddedId.value = '' })
@@ -205,10 +219,7 @@ const remainingProtein = computed(() => {
 
 const emptyMessage = computed(() => '暂无食谱，点击「+ 自建」创建')
 
-function mealTimeLabel(t: string) {
-  const map: Record<string, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }
-  return map[t] || ''
-}
+const mealTimeLabel = recipeMealLabel
 function typeLabel(t: string) {
   const map: Record<string, string> = { light: '轻量', standard: '标准', rich: '丰盛' }
   return map[t] || ''
@@ -276,4 +287,5 @@ function doSwap(alt: typeof allFoods.value[number]) {
 
 .meal-links { display:flex; align-items:center; flex-wrap:wrap; column-gap:12px; }.edit-link { margin:0; padding:0; min-height:44px; line-height:44px; background:transparent; color:var(--brand); font-size:12px; }.detail-edit { margin:12px 0 0; padding:0 12px; line-height:44px; min-height:44px; background:var(--wash); color:var(--brand); font-size:13px; border-radius:12px; }
 @media(max-width:350px) { .meal-links { column-gap:10px; }.meal-footer { gap:6px; } }
+.hidden-entry { padding:12px 14px; border:1px solid var(--line); background:var(--wash); border-radius:14px; margin-bottom:16px; }.hidden-entry button { margin:0; padding:0; min-height:44px; line-height:1.7; background:transparent; color:var(--brand); font-size:13px; text-align:left; white-space:normal; }
 </style>
